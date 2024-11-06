@@ -159,13 +159,13 @@ def generator_view(request):
 
             ####from here run the github action, we need user, repo, access token.
             if platform == 'windows':
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/generator-windows.yml/dispatches' 
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-windows.yml/dispatches' 
             elif platform == 'linux':
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/generator-linux.yml/dispatches'  
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-linux.yml/dispatches'  
             elif platform == 'android':
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/generator-android.yml/dispatches'
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-android.yml/dispatches'
             else:
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/generator-windows.yml/dispatches'
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-windows.yml/dispatches'
 
             #url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rustdesk/actions/workflows/test.yml/dispatches'  
             data = {
