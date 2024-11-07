@@ -24,8 +24,8 @@
                 </ul></li>
             <li>github secrets (setup on your github account for your rdgen repo):  
                 <oul>
-                <li>GENURL="example.com:8083"  </li>
-                *this is the domain and port that your are running rdgen on, needs to be accesible on the internet
+                <li>GENURL="example.com:8000"  </li>
+                *this is the domain and port that your are running rdgen on, needs to be accesible on the internet, depending on how you have this setup the port may not be needed
                 </ul></li>
             <li>optional github secrets (for signing the code):  
                 <ul>
@@ -74,3 +74,44 @@
 ### open your web browser to yourdomain:8000
 
 ### use nginx, caddy, traefik, etc. for ssl reverse proxy
+
+## A few notes:
+
+<ul>
+    <li>If you change your repository name, make sure to change the url on lines 161-168 of views.py to reflect the change</li>
+    <li>If you are running on http instead of https, make sure to make the change on line 70 of views.py</li>
+</ul>
+
+## To autostart the server on boot, you can set up a systemd service called rdgen.service
+
+replace user, group, and port if you need to  
+replace /opt with wherever you have installed rdgen  
+save the following file as /etc/systed/system/rdgen.service  
+```
+[Unit]
+Description=Rustdesk Client Generator
+[Service]
+Type=simple
+LimitNOFILE=1000000
+ExecStart=/usr/bin/python3 /opt/rdgen/manage.py runserver 0.0.0.0:8000
+WorkingDirectory=/opt/rdgen/
+User=root
+Group=root
+Restart=always
+StandardOutput=file:/var/log/rdgen.log
+StandardError=file:/var/log/rdgen.error
+# Restart service after 10 seconds if node service crashes
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+```
+
+then run this to enable autostarting the service on boot, and then start it manually this time:
+```
+sudo systemctl enable rdgen.service
+sudo systemctl start rdgen.service
+```
+and to get the status of the server, run:
+```
+sudo systemctl status rdgen.service
+```
