@@ -102,7 +102,7 @@ jobs:
   build-for-windows-flutter:
     name: Build Windows
     needs: [build-RustDeskTempTopMostWindow]
-    runs-on: self-hosted
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
