@@ -117,6 +117,9 @@ jobs:
             }
           # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
+      - name: bash
+        shell: bash
+        run: ls -la
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
