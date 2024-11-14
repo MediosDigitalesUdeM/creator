@@ -117,8 +117,7 @@ jobs:
             }
           # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
-
-    - name: Run shell commands
+      - name: Run shell commands
         shell: pwsh # or pwsh for PowerShell
         run: |
         
