@@ -1,6 +1,6 @@
 name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
-on:
+on: 
   workflow_dispatch:
     inputs:
       server:
@@ -54,24 +54,29 @@ on:
         default: '{}'
         type: string
 
+
 env:
-  SCITER_RUST_VERSION: "1.75"
-  RUST_VERSION: "1.75"
+  SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
+  RUST_VERSION: "1.75" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
   CARGO_NDK_VERSION: "3.1.2"
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.14-1"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.19.6"
-  ANDROID_FLUTTER_VERSION: "3.13.9"
+  ANDROID_FLUTTER_VERSION: "3.13.9" # >= 3.16 is very slow on my android phone, but work well on most of others. We may switch to new flutter after changing to texture rendering (I believe it can solve my problem).
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   NDK_VERSION: "r27b"
+  #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
+  # To make a custom build with your own servers set the below secret values
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
   CUSTOM: "${{ inputs.custom }}"
@@ -80,6 +85,7 @@ env:
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
+
 
 jobs:
   build-RustDeskTempTopMostWindow:
@@ -101,12 +107,15 @@ jobs:
       fail-fast: false
       matrix:
         job:
+          # - { target: i686-pc-windows-msvc        , os: windows-2022                  }
+          # - { target: x86_64-pc-windows-gnu       , os: windows-2022                  }
           - {
               target: x86_64-pc-windows-msvc,
               os: windows-2022,
               arch: x86_64,
               vcpkg-triplet: x64-windows-static,
             }
+          # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -146,59 +155,42 @@ jobs:
         with:
           repository: rustdesk/rustdesk
 
-      - name: Install dependencies
+      - name: Install ImageMagick on Windows
         run: |
           choco install -y imagemagick.app --no-progress
-          choco install -y 7zip
+          Get-ChildItem -Path "${env:ProgramFiles}" | % { $_.FullName } | Select-String -Pattern "[\/\\]ImageMagick[^\/\\]*$" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
 
-      - name: Update cargo.toml and other files
+      - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: true
-        shell: powershell  # Change to powershell if your requirements need it
+        shell: bash
         run: |
-         Copy-Item -Path ./Cargo.toml -Destination ./Cargo.toml.bak
-    (Get-Content ./Cargo.toml) -replace 'description = "RustDesk Remote Desktop"', 'description = "${{ inputs.appname }}"' |
-      Set-Content ./Cargo.toml
-    (Get-Content ./Cargo.toml) -replace 'ProductName = "RustDesk"', 'ProductName = "${{ inputs.appname }}"' |
-      Set-Content ./Cargo.toml
-    (Get-Content ./Cargo.toml) -replace 'FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "${{ inputs.appname }}"' |
-      Set-Content ./Cargo.toml
-    (Get-Content ./Cargo.toml) -replace 'OriginalFilename = "rustdesk.exe"', "OriginalFilename = '${{ inputs.appname }}.exe'" |
-      Set-Content ./Cargo.toml
-    Copy-Item -Path ./libs/portable/Cargo.toml -Destination ./libs/portable/Cargo.toml.bak
-    (Get-Content ./libs/portable/Cargo.toml) -replace 'description = "RustDesk Remote Desktop"', 'description = "${{ inputs.appname }}"' |
-      Set-Content ./libs/portable/Cargo.toml
-    (Get-Content ./libs/portable/Cargo.toml) -replace 'ProductName = "RustDesk"', 'ProductName = "${{ inputs.appname }}"' |
-      Set-Content ./libs/portable/Cargo.toml
-    (Get-Content ./libs/portable/Cargo.toml) -replace 'FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "${{ inputs.appname }}"' |
-      Set-Content ./libs/portable/Cargo.toml
-    (Get-Content ./libs/portable/Cargo.toml) -replace 'OriginalFilename = "rustdesk.exe"', "OriginalFilename = '${{ inputs.appname }}.exe'" |
-      Set-Content ./libs/portable/Cargo.toml
-    Copy-Item -Path ./flutter/windows/runner/Runner.rc -Destination ./flutter/windows/runner/Runner.rc.bak
-    (Get-Content ./flutter/windows/runner/Runner.rc) -replace '"RustDesk Remote Desktop"', '"${{ inputs.appname }}"' |
-      Set-Content ./flutter/windows/runner/Runner.rc
-    (Get-Content ./flutter/windows/runner/Runner.rc) -replace 'VALUE "InternalName", "rustdesk" "\0"', 'VALUE "InternalName", "${{ inputs.appname }}" "\0"' |
-      Set-Content ./flutter/windows/runner/Runner.rc
-    (Get-Content ./flutter/windows/runner/Runner.rc) -replace '"Copyright © 2024 Purslane Ltd. All rights reserved."', '"Copyright © 2024"' |
-      Set-Content ./flutter/windows/runner/Runner.rc
-    (Get-Content ./flutter/windows/runner/Runner.rc) -replace '"rustdesk.exe"', '"${{ inputs.filename }}"' |
-      Set-Content ./flutter/windows/runner/Runner.rc
-    (Get-Content ./src/lang/en.rs) -replace 'RustDesk', '${{ inputs.appname }}' |
-      Set-Content ./src/lang/en.rs
-    (Get-Content ./build.py) -replace 'Homepage: https://rustdesk.com', 'Homepage: ${{ fromJson(inputs.extras).urlLink }}' |
-      Set-Content ./build.py
-    (Get-Content ./flutter/lib/common.dart) -replace "launchUrl(Uri.parse('https://rustdesk.com'))", "launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'))" |
-      Set-Content ./flutter/lib/common.dart
-    (Get-Content ./flutter/lib/desktop/pages/desktop_setting_page.dart) -replace "launchUrlString('https://rustdesk.com')", "launchUrlString('${{ fromJson(inputs.extras).urlLink }}')" |
-      Set-Content ./flutter/lib/desktop/pages/desktop_setting_page.dart
-    (Get-Content ./flutter/lib/desktop/pages/desktop_setting_page.dart) -replace "launchUrlString('https://rustdesk.com/privacy.html')", "launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')" |
-      Set-Content ./flutter/lib/desktop/pages/desktop_setting_page.dart
-    (Get-Content ./flutter/lib/mobile/pages/settings_page.dart) -replace "const url = 'https://rustdesk.com/';", "const url = '${{ fromJson(inputs.extras).urlLink }}';" |
-      Set-Content ./flutter/lib/mobile/pages/settings_page.dart
-    (Get-Content ./flutter/lib/mobile/pages/settings_page.dart) -replace "launchUrlString('https://rustdesk.com/privacy.html')", "launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')" |
-      Set-Content ./flutter/lib/mobile/pages/settings_page.dart
-    (Get-Content ./flutter/lib/desktop/pages/install_page.dart) -replace "https://rustdesk.com/privacy.html", "${{ fromJson(inputs.extras).urlLink }}/privacy.html" |
-      Set-Content ./flutter/lib/desktop/pages/install_page.dart
-    (Get-Content ./src/common.rs) | Where-Object {$_ -notmatch 'const KEY:|let Ok(data) = sign::verify(&data, &pk)'} | Set-Content ./src/common.rs
+          cp ./Cargo.toml ./Cargo.toml.bak
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
+          cp ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
+          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
+          sed -i -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"Copyright © 2024 Purslane Ltd. All rights reserved."|"Copyright © 2024"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"rustdesk.exe"|"${{ inputs.filename }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          cp ./src/lang/en.rs ./src/lang/en.rs.bak
+          sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
+          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
+          sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
+          sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i -e "s|const url = 'https://rustdesk.com/';|const url = '${{ fromJson(inputs.extras).urlLink }}';|" ./flutter/lib/mobile/pages/settings_page.dart
+          sed -i -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/mobile/pages/settings_page.dart
+          sed -i -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
+          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
+          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -214,7 +206,7 @@ jobs:
           data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
 
       - name: Install flutter
-        uses: subosito/flutter-action@v2.12.0
+        uses: subosito/flutter-action@v2.12.0 #https://github.com/subosito/flutter-action/issues/277
         with:
           channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -283,6 +275,7 @@ jobs:
       - name: icon stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
+        shell: bash
         run: |
           mv ./res/icon.ico ./res/icon.ico.bak
           mv ./res/icon.png ./res/icon.png.bak
@@ -304,6 +297,7 @@ jobs:
           magick ./res/icon.png -resize 64x64 ./res/64x64.png
           magick ./res/icon.png -resize 128x128 ./res/128x128.png
           magick ./res/128x128.png -resize 200% ./res/128x128@2x.png
+
 
       - name: ui.rs icon
         if: ${{ inputs.iconlink != 'false' }}
@@ -352,6 +346,10 @@ jobs:
           customHeaders: '{"Content-Type": "application/json"}'
           data: '{"uuid": "${{ inputs.uuid }}", "status": "30% complete"}'
 
+      # - name: generate rustbridge
+      #   run: |
+      #     ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
+
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
@@ -370,6 +368,14 @@ jobs:
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
           mv -Force .\usbmmidd_v2 ./rustdesk
 
+      # - name: logo stuff
+      #   if: ${{ inputs.logolink != 'false' }}
+      #   continue-on-error: true
+      #   shell: bash
+      #   run: |
+      #     #echo "${{ inputs.logobase64 }}" | base64 -d > ./rustdesk/data/flutter_assets/assets/logo.png
+          
+
       - name: icon stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
@@ -383,7 +389,10 @@ jobs:
         run: |
           Invoke-WebRequest -Uri ${{ fromJson(inputs.logolink).url }}/get_png?filename=${{ fromJson(inputs.logolink).file }}"&"uuid=${{ fromJson(inputs.logolink).uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
 
+
       - name: find Runner.res
+        # Windows: find Runner.res (compiled from ./flutter/windows/runner/Runner.rc), copy to ./Runner.res
+        # Runner.rc does not contain actual version, but Runner.res does
         continue-on-error: true
         shell: bash
         run: |
@@ -411,6 +420,13 @@ jobs:
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
           path: rustdesk
 
+      # - name: Sign rustdesk files
+      #   if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != ''
+      #   shell: bash
+      #   run: |
+      #     pip3 install requests argparse
+      #     BASE_URL=${{ secrets.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./rustdesk/
+
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
@@ -426,6 +442,7 @@ jobs:
           certificate: '${{ secrets.WINDOWS_PFX_BASE64 }}'
           password: '${{ secrets.WINDOWS_PFX_PASSWORD }}'
           certificatesha1: '${{ secrets.WINDOWS_PFX_SHA1_THUMBPRINT }}'
+          # certificatename: '${{ secrets.CERTNAME }}'
           folder: './rustdesk/'
           recursive: true
 
@@ -448,6 +465,26 @@ jobs:
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe "./SignOutput/rustdesk.exe"
 
+      # - name: Add MSBuild to PATH
+      #   uses: microsoft/setup-msbuild@v2
+
+      # - name: Build msi
+      #   if: env.UPLOAD_ARTIFACT == 'true'
+      #   run: |
+      #     pushd ./res/msi
+      #     python preprocess.py --arp -d ../../rustdesk
+      #     nuget restore msi.sln
+      #     msbuild msi.sln -p:Configuration=Release -p:Platform=x64 /p:TargetVersion=Windows10
+      #     cp ./Package/bin/x64/Release/en-us/Package.msi ../../SignOutput/rustdesk-latest.msi
+      #     mv ./Package/bin/x64/Release/en-us/Package.msi ../../SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
+      #     sha256sum ../../SignOutput/rustdesk-*.msi
+
+      # - name: Sign rustdesk self-extracted file
+      #   if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != ''
+      #   shell: bash
+      #   run: |
+      #     BASE_URL=${{ secrets.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./SignOutput
+
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
@@ -463,11 +500,33 @@ jobs:
           certificate: '${{ secrets.WINDOWS_PFX_BASE64 }}'
           password: '${{ secrets.WINDOWS_PFX_PASSWORD }}'
           certificatesha1: '${{ secrets.WINDOWS_PFX_SHA1_THUMBPRINT }}'
+          # certificatename: '${{ secrets.WINDOWS_PFX_NAME }}'
+          folder: './SignOutput'
+          recursive: false
+
+      # - name: Publish Release
+      #   uses: softprops/action-gh-release@v1
+      #   if: env.UPLOAD_ARTIFACT == 'true'
+      #   with:
+      #     prerelease: true
+      #     tag_name: ${{ env.TAG_NAME }}
+      #     files: |
+      #       ./SignOutput/rustdesk-*.msi
+      #       ./SignOutput/rustdesk-*.exe
 
       - name: rename rustdesk.exe to filename.exe
         run: |
           mv ./SignOutput/rustdesk.exe "./SignOutput/${{ inputs.filename }}.exe" || echo "rustdesk"
 
+      # - name: Upload to FTP
+      #   if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
+      #   uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      #   with:
+      #     server: ${{ secrets.GEN_FTP_SERVER }}
+      #     username: ${{ secrets.GEN_FTP_USER }}
+      #     password: ${{ secrets.GEN_FTP_PASSWORD }}
+      #     local-dir: ./SignOutput/
+      #     server-dir: /root/rdgen/exe/${{ env.UUIDFOLDER }}/
       - name: send file to rdgen server
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
         shell: bash
