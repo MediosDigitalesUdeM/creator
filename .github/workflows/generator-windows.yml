@@ -162,9 +162,7 @@ jobs:
 
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: true
-        - name: Change Directory and Run
-          working-directory: ./mnt/f/actions-runner/_work
-          shell: bash
+        shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
           sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
