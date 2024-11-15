@@ -206,22 +206,6 @@ jobs:
           customHeaders: '{"Content-Type": "application/json"}'
           data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
 
-      - name: Install jq
-        run: |
-          echo "Installing jq..."
-          Invoke-WebRequest -Uri https://github.com/stedolan/jq/releases/latest/download/jq-win64.exe -OutFile jq.exe
-          # Check if jq.exe already exists and remove it
-          if (Test-Path "C:\Program Files\jq.exe") {
-            Remove-Item "C:\Program Files\jq.exe"
-          }
-          Move-Item jq.exe "C:\Program Files\jq.exe"
-          # Verify installation and run jq
-          & "C:\Program Files\jq.exe" --version
-
-      - name: Verify jq installation
-        run: |
-          & "C:\Program Files\jq.exe" --version
-
       - name: Install flutter
         uses: subosito/flutter-action@v2.12.0 #https://github.com/subosito/flutter-action/issues/277
         with:
