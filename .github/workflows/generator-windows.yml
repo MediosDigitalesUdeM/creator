@@ -1,6 +1,6 @@
 name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
-on: 
+on:
   workflow_dispatch:
     inputs:
       server:
@@ -117,10 +117,10 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-      
-     - name: Install Rust
-       shell: pwsh
-       run: |
+
+      - name: Install Rust
+        shell: pwsh
+        run: |
           # Download the Rust installation script
           Invoke-WebRequest -Uri https://sh.rustup.rs -OutFile rustup-init.sh
           # Run the installation script
@@ -289,7 +289,7 @@ jobs:
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
         run: |
-          Invoke-WebRequest -Uri ${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}"&"uuid=${{ fromJson(inputs.iconlink).uuid }} -OutFile ./res/icon.png 
+          Invoke-WebRequest -Uri ${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}"&uuid=${{ fromJson(inputs.iconlink).uuid }}" -OutFile ./res/icon.png 
           mv ./res/32x32.png ./res/32x32.png.bak
           mv ./res/64x64.png ./res/64x64.png.bak
           mv ./res/128x128.png ./res/128x128.png.bak
@@ -377,20 +377,20 @@ jobs:
         if: ${{ inputs.logolink != 'false' }}
         continue-on-error: true
         run: |
-          Invoke-WebRequest -Uri ${{ fromJson(inputs.logolink).url }}/get_png?filename=${{ fromJson(inputs.logolink).file }}"&"uuid=${{ fromJson(inputs.logolink).uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
+          Invoke-WebRequest -Uri ${{ fromJson(inputs.logolink).url }}/get_png?filename=${{ fromJson(inputs.logolink).file }}"&uuid=${{ fromJson(inputs.logolink).uuid }}" -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
 
       - name: find Runner.res
         continue-on-error: true
         shell: bash
         run: |
-          runner_res=$(find . -name "Runner.res");
+          runner_res=$(find . -name "Runner.res")
           if [ "$runner_res" == "" ]; then
-            echo "Runner.res: not found";
+            echo "Runner.res: not found"
           else
-            echo "Runner.res: $runner_res";
-            cp $runner_res ./libs/portable/Runner.res;
-            echo "list ./libs/portable/Runner.res";
-            ls -l ./libs/portable/Runner.res;
+            echo "Runner.res: $runner_res"
+            cp $runner_res ./libs/portable/Runner.res
+            echo "list ./libs/portable/Runner.res"
+            ls -l ./libs/portable/Runner.res
           fi
 
       - name: Download RustDeskTempTopMostWindow artifacts
