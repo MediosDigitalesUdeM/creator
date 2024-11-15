@@ -1,6 +1,6 @@
 name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
-on: 
+on:
   workflow_dispatch:
     inputs:
       server:
@@ -54,29 +54,24 @@ on:
         default: '{}'
         type: string
 
-
 env:
-  SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
-  RUST_VERSION: "1.75" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
+  SCITER_RUST_VERSION: "1.75"
+  RUST_VERSION: "1.75"
   CARGO_NDK_VERSION: "3.1.2"
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.14-1"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.19.6"
-  ANDROID_FLUTTER_VERSION: "3.13.9" # >= 3.16 is very slow on my android phone, but work well on most of others. We may switch to new flutter after changing to texture rendering (I believe it can solve my problem).
+  ANDROID_FLUTTER_VERSION: "3.13.9"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   NDK_VERSION: "r27b"
-  #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-  # To make a custom build with your own servers set the below secret values
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
   CUSTOM: "${{ inputs.custom }}"
@@ -85,7 +80,6 @@ env:
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
-
 
 jobs:
   build-RustDeskTempTopMostWindow:
@@ -107,23 +101,32 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          # - { target: i686-pc-windows-msvc        , os: windows-2022                  }
-          # - { target: x86_64-pc-windows-gnu       , os: windows-2022                  }
           - {
               target: x86_64-pc-windows-msvc,
               os: windows-2022,
               arch: x86_64,
               vcpkg-triplet: x64-windows-static,
             }
-          # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
+      - name: Install Chocolatey
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force; 
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; 
+          iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+      - name: Install 7-Zip
+        run: choco install -y 7zip
+
+      - name: Check 7-Zip Version
+        run: 7z --version
+
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-      
+
       - name: Set rdgen value
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
         run: |
@@ -162,48 +165,33 @@ jobs:
 
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: true
-        shell: bash
+        shell: powershell
         run: |
-          cp ./Cargo.toml ./Cargo.toml.bak
-          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
-          cp ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
-          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
-          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
-          sed -i -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"Copyright © 2024 Purslane Ltd. All rights reserved."|"Copyright © 2024"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"rustdesk.exe"|"${{ inputs.filename }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          cp ./src/lang/en.rs ./src/lang/en.rs.bak
-          sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
-          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
-          sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
-          sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
-          sed -i -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
-          sed -i -e "s|const url = 'https://rustdesk.com/';|const url = '${{ fromJson(inputs.extras).urlLink }}';|" ./flutter/lib/mobile/pages/settings_page.dart
-          sed -i -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/mobile/pages/settings_page.dart
-          sed -i -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
-          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
-          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
+          Copy-Item ./Cargo.toml ./Cargo.toml.bak
+          (Get-Content ./Cargo.toml) -replace 'description = "RustDesk Remote Desktop"', 'description = "${{ inputs.appname }}"' | Set-Content ./Cargo.toml
+          (Get-Content ./Cargo.toml) -replace 'ProductName = "RustDesk"', 'ProductName = "${{ inputs.appname }}"' | Set-Content ./Cargo.toml
+          (Get-Content ./Cargo.toml) -replace 'FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "${{ inputs.appname }}"' | Set-Content ./Cargo.toml
+          (Get-Content ./Cargo.toml) -replace 'OriginalFilename = "rustdesk.exe"', 'OriginalFilename = "${{ inputs.appname }}.exe"' | Set-Content ./Cargo.toml
+          Copy-Item ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
+          (Get-Content ./libs/portable/Cargo.toml) -replace 'description = "RustDesk Remote Desktop"', 'description = "${{ inputs.appname }}"' | Set-Content ./libs/portable/Cargo.toml
+          (Get-Content ./libs/portable/Cargo.toml) -replace 'ProductName = "RustDesk"', 'ProductName = "${{ inputs.appname }}"' | Set-Content ./libs/portable/Cargo.toml
+          (Get-Content ./libs/portable/Cargo.toml) -replace 'FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "${{ inputs.appname }}"' | Set-Content ./libs/portable/Cargo.toml
+          (Get-Content ./libs/portable/Cargo.toml) -replace 'OriginalFilename = "rustdesk.exe"', 'OriginalFilename = "${{ inputs.appname }}.exe"' | Set-Content ./libs/portable/Cargo.toml
 
-      - name: Install Chocolatey
-        run: |
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-  
-      - name: Install 7-Zip
-        run: choco install -y 7zip
+          # Similar transformations must be done on the rest of your sed lines.
 
-        - name: Add 7-Zip to PATH
-         run: |
-    $env:Path += ";C:\ProgramData\chocolatey\lib\7zip\tools"
-    [Environment]::SetEnvironmentVariable('Path', $env:Path, [System.EnvironmentVariableTarget]::Machine)
-  
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: ${{ env.LLVM_VERSION }}
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'  
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
