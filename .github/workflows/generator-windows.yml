@@ -1,6 +1,6 @@
 name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
-on:
+on: 
   workflow_dispatch:
     inputs:
       server:
@@ -54,24 +54,29 @@ on:
         default: '{}'
         type: string
 
+
 env:
-  SCITER_RUST_VERSION: "1.75"
-  RUST_VERSION: "1.75"
+  SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
+  RUST_VERSION: "1.75" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
   CARGO_NDK_VERSION: "3.1.2"
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.14-1"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.19.6"
-  ANDROID_FLUTTER_VERSION: "3.13.9"
+  ANDROID_FLUTTER_VERSION: "3.13.9" # >= 3.16 is very slow on my android phone, but work well on most of others. We may switch to new flutter after changing to texture rendering (I believe it can solve my problem).
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   NDK_VERSION: "r27b"
+  #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
+  # To make a custom build with your own servers set the below secret values
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
   CUSTOM: "${{ inputs.custom }}"
@@ -80,6 +85,7 @@ env:
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
+
 
 jobs:
   build-RustDeskTempTopMostWindow:
@@ -96,34 +102,28 @@ jobs:
   build-for-windows-flutter:
     name: Build Windows
     needs: [build-RustDeskTempTopMostWindow]
-    runs-on: self-hosted
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         job:
+          # - { target: i686-pc-windows-msvc        , os: windows-2022                  }
+          # - { target: x86_64-pc-windows-gnu       , os: windows-2022                  }
           - {
               target: x86_64-pc-windows-msvc,
               os: windows-2022,
               arch: x86_64,
               vcpkg-triplet: x64-windows-static,
             }
+          # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
-      - name: Install Chocolatey
-        run: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force; 
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; 
-          iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-
-      - name: Install 7-Zip
-        run: choco install -y 7zip
-
-     - name: Export GitHub Actions cache environment variables
+      - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
+      
       - name: Set rdgen value
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
         run: |
@@ -203,8 +203,8 @@ jobs:
           url: ${{ env.STATUS_URL }}
           method: 'POST'
           customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'  
-     
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
+
       - name: Install flutter
         uses: subosito/flutter-action@v2.12.0 #https://github.com/subosito/flutter-action/issues/277
         with:
