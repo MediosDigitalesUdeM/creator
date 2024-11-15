@@ -159,6 +159,10 @@ jobs:
         run: |
           echo "Installing jq..."
           Invoke-WebRequest -Uri https://github.com/stedolan/jq/releases/latest/download/jq-win64.exe -OutFile jq.exe
+          # Check if jq.exe already exists and remove it
+          if (Test-Path "C:\Program Files\jq.exe") {
+            Remove-Item "C:\Program Files\jq.exe"
+          }
           Move-Item jq.exe "C:\Program Files\jq.exe"
           # Add jq to PATH
           [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files", [EnvironmentVariableTarget]::Machine)
