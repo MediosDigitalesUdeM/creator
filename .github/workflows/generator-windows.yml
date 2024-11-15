@@ -192,6 +192,10 @@ jobs:
           sed -i -e '/const KEY:/,/};/d' ./src/common.rs
           sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
 
+      - name: Install 7zip
+        run: choco install -y 7zip
+
+
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
