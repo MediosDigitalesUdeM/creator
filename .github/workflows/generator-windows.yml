@@ -163,9 +163,6 @@ jobs:
           # Add jq to PATH
           [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files", [EnvironmentVariableTarget]::Machine)
 
-      - name: Verify jq installation
-        run: |
-          jq --version
 
       - name: Install ImageMagick on Windows
         run: |
