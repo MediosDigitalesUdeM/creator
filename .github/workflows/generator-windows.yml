@@ -192,10 +192,18 @@ jobs:
           sed -i -e '/const KEY:/,/};/d' ./src/common.rs
           sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
 
-      - name: Install 7zip
+      - name: Install Chocolatey
+        run: |
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+  
+      - name: Install 7-Zip
         run: choco install -y 7zip
 
-
+        - name: Add 7-Zip to PATH
+         run: |
+    $env:Path += ";C:\ProgramData\chocolatey\lib\7zip\tools"
+    [Environment]::SetEnvironmentVariable('Path', $env:Path, [System.EnvironmentVariableTarget]::Machine)
+  
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
