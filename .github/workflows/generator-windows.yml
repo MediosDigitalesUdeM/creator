@@ -155,6 +155,18 @@ jobs:
         with:
           repository: rustdesk/rustdesk
 
+      - name: Install jq
+        run: |
+          echo "Installing jq..."
+          Invoke-WebRequest -Uri https://github.com/stedolan/jq/releases/latest/download/jq-win64.exe -OutFile jq.exe
+          Move-Item jq.exe "C:\Program Files\jq.exe"
+          # Add jq to PATH
+          [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files", [EnvironmentVariableTarget]::Machine)
+
+      - name: Verify jq installation
+        run: |
+          jq --version
+
       - name: Install ImageMagick on Windows
         run: |
           choco install -y imagemagick.app --no-progress
