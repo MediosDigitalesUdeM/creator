@@ -119,7 +119,7 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Install Rust
-        shell: pwsh
+        shell: bash
         run: |
           # Download the Rust installation script
           Invoke-WebRequest -Uri https://sh.rustup.rs -OutFile rustup-init.sh
