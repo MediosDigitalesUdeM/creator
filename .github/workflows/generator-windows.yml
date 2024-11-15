@@ -118,12 +118,15 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       
-      - name: Install Rust
+     - name: Install Rust
+        shell: pwsh
         run: |
-          echo "Installing Rust..."
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          echo "::add-path::${{ github.workspace }}/.cargo/bin"
-          echo "::add-path::${HOME}/.cargo/bin"
+          # Download the Rust installation script
+          Invoke-WebRequest -Uri https://sh.rustup.rs -OutFile rustup-init.sh
+          # Run the installation script
+          Start-Process -Wait -File ./rustup-init.sh -ArgumentList "-y"
+          # Add the installed cargo to PATH
+          echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
           # Confirm installation
           rustup --version
           cargo --version
