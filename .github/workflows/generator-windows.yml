@@ -117,10 +117,7 @@ jobs:
       - name: Install 7-Zip
         run: choco install -y 7zip
 
-      - name: Check 7-Zip Version
-        run: 7z --version
-
-      - name: Export GitHub Actions cache environment variables
+     - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
           script: |
@@ -167,18 +164,33 @@ jobs:
         continue-on-error: true
         shell: powershell
         run: |
-          Copy-Item ./Cargo.toml ./Cargo.toml.bak
-          (Get-Content ./Cargo.toml) -replace 'description = "RustDesk Remote Desktop"', 'description = "${{ inputs.appname }}"' | Set-Content ./Cargo.toml
-          (Get-Content ./Cargo.toml) -replace 'ProductName = "RustDesk"', 'ProductName = "${{ inputs.appname }}"' | Set-Content ./Cargo.toml
-          (Get-Content ./Cargo.toml) -replace 'FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "${{ inputs.appname }}"' | Set-Content ./Cargo.toml
-          (Get-Content ./Cargo.toml) -replace 'OriginalFilename = "rustdesk.exe"', 'OriginalFilename = "${{ inputs.appname }}.exe"' | Set-Content ./Cargo.toml
-          Copy-Item ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
-          (Get-Content ./libs/portable/Cargo.toml) -replace 'description = "RustDesk Remote Desktop"', 'description = "${{ inputs.appname }}"' | Set-Content ./libs/portable/Cargo.toml
-          (Get-Content ./libs/portable/Cargo.toml) -replace 'ProductName = "RustDesk"', 'ProductName = "${{ inputs.appname }}"' | Set-Content ./libs/portable/Cargo.toml
-          (Get-Content ./libs/portable/Cargo.toml) -replace 'FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "${{ inputs.appname }}"' | Set-Content ./libs/portable/Cargo.toml
-          (Get-Content ./libs/portable/Cargo.toml) -replace 'OriginalFilename = "rustdesk.exe"', 'OriginalFilename = "${{ inputs.appname }}.exe"' | Set-Content ./libs/portable/Cargo.toml
-
-          # Similar transformations must be done on the rest of your sed lines.
+           cp ./Cargo.toml ./Cargo.toml.bak
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
+          cp ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
+          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
+          sed -i -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"Copyright © 2024 Purslane Ltd. All rights reserved."|"Copyright © 2024"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"rustdesk.exe"|"${{ inputs.filename }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          cp ./src/lang/en.rs ./src/lang/en.rs.bak
+          sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
+          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
+          sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
+          sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i -e "s|const url = 'https://rustdesk.com/';|const url = '${{ fromJson(inputs.extras).urlLink }}';|" ./flutter/lib/mobile/pages/settings_page.dart
+          sed -i -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/mobile/pages/settings_page.dart
+          sed -i -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
+          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
+          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -192,19 +204,7 @@ jobs:
           method: 'POST'
           customHeaders: '{"Content-Type": "application/json"}'
           data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'  
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: ${{ env.LLVM_VERSION }}
-
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
-
+     
       - name: Install flutter
         uses: subosito/flutter-action@v2.12.0 #https://github.com/subosito/flutter-action/issues/277
         with:
