@@ -162,7 +162,7 @@ jobs:
 
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: true
-        shell: powershell
+        shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
           sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
