@@ -215,11 +215,11 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
-        shell: bash
         with:
           toolchain: ${{ env.SCITER_RUST_VERSION }}
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
+        shell: bash
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
