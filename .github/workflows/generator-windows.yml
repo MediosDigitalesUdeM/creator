@@ -213,6 +213,7 @@ jobs:
           cache: true
 
       - name: Install RustUp
+        shell: bash
         run: |
           curl --proto   -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.75 -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
