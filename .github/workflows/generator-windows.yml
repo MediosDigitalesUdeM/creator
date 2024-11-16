@@ -212,10 +212,10 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Install Rust
+      - name: Install RustUp
         run: |
-    curl --proto   -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.75 -y
-    echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          curl --proto   -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.75 -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
