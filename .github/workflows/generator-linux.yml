@@ -95,7 +95,7 @@ jobs:
   build-rustdesk-linux:
     needs: [generate-bridge-linux]
     name: build rustdesk linux ${{ matrix.job.target }}
-    runs-on: ${{ matrix.job.on }}
+    runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:
