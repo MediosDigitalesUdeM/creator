@@ -35,6 +35,7 @@ def generator_view(request):
                 apiServer = server+":21114"
             if not urlLink:
                 urlLink = "https://rustdesk.com"
+            slogan = form.cleaned_data['slogan']
             direction = form.cleaned_data['direction']
             installation = form.cleaned_data['installation']
             settings = form.cleaned_data['settings']
@@ -155,6 +156,7 @@ def generator_view(request):
             extras['delayFix'] = 'true' if delayFix else 'false'
             extras['version'] = version
             extras['rdgen'] = 'true'
+            extras['slogan'] = slogan
             extra_input = json.dumps(extras)
 
             ####from here run the github action, we need user, repo, access token.
