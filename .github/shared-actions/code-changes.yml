@@ -35,7 +35,14 @@ runs:
         magick ./res/icon.png -resize 128x128 ./res/128x128.png
         magick ./res/128x128.png -resize 200% ./res/128x128@2x.png
 
-
+    - name: Update connection port
+      continue-on-error: true
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.connectionPort }}" ]; then
+            sed -i -e 's|let default_port = .*$|let default_port = "${{ inputs.connectionPort }}";|' ./src/config.rs # Hypothetical path
+        fi
+    
     - name: ui.rs icon
       continue-on-error: true
       shell: bash
