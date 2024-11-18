@@ -9,6 +9,8 @@ inputs:
     required: true
   filename:
     required: true
+  custom_slogan:
+    required: true
 runs:
   using: "composite"
   steps:
@@ -20,7 +22,14 @@ runs:
         mv ./res/icon.png ./res/icon.png.bak
         mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
         echo "${{ inputs.iconbase64 }}" | base64 -d > ./res/icon.png
-
+  
+    - name: Update slogan in en.rs
+      continue-on-error: true
+      shell: bash
+      run: |
+    cp ./src/lang/en.rs ./src/lang/en.rs.bak
+    sed -i -e 's|("Slogan_tip",.*)|("Slogan_tip", "${{ inputs.custom_slogan }}"),|' ./src/lang/en.rs
+    
     - name: magick stuff
       continue-on-error: true
       run: |
