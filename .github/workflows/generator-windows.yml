@@ -161,7 +161,7 @@ jobs:
           Get-ChildItem -Path "${env:ProgramFiles}" | % { $_.FullName } | Select-String -Pattern "[\/\\]ImageMagick[^\/\\]*$" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
 
       - name: cargo.toml, runner.rc name, en.rs
-        continue-on-error: true
+        continue-on-error: false
         shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
@@ -182,7 +182,7 @@ jobs:
           sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
-          sed -i -e 's|Slogan_tip: = "Made with heart in this chaotic world!"|Slogan_tip = "${{ fromJson(inputs.extras).slogan }}"|' ./src/lang/en.rs
+          sed -i -e 's|Slogan_tip = "Made with heart in this chaotic world!"|Slogan_tip = "${{ fromJson(inputs.extras).slogan }}"|' ./src/lang/en.rs
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
           sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
           sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
