@@ -95,7 +95,7 @@ jobs:
   build-rustdesk-linux:
     needs: [generate-bridge-linux]
     name: build rustdesk linux ${{ matrix.job.target }}
-    runs-on: ${{ matrix.job.on }}
+    runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:
@@ -291,6 +291,7 @@ jobs:
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
           sed -i -e 's|For faster connection, please set up your own server||' ./src/lang/en.rs
+          sed -i -e 's|Made with heart in this chaotic world!|${{ fromJson(inputs.extras).slogan }}|' ./src/lang/en.rs
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
           sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
           sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
