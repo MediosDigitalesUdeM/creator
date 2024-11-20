@@ -182,6 +182,7 @@ jobs:
           sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
+          sed -i -e 's|Made with heart in this chaotic world!|${{ fromJson(inputs.extras).slogan }}|' ./src/lang/en.rs
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
           sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
           sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
@@ -191,6 +192,8 @@ jobs:
           sed -i -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
           sed -i -e '/const KEY:/,/};/d' ./src/common.rs
           sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
+          cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
+          sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
