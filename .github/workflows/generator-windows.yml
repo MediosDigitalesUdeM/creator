@@ -519,8 +519,10 @@ jobs:
       #       ./SignOutput/rustdesk-*.exe
 
       - name: rename rustdesk.exe to filename.exe
+        shell: bash
         run: |
           mv ./SignOutput/rustdesk.exe "./SignOutput/${{ inputs.filename }}.exe" || echo "rustdesk"
+          
 
       # - name: Upload to FTP
       #   if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
