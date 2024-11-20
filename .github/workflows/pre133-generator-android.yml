@@ -62,8 +62,8 @@ env:
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.14-1"
   LLVM_VERSION: "15.0.6"
-  FLUTTER_VERSION: "3.24.4"
-  ANDROID_FLUTTER_VERSION: "3.24.4" 
+  FLUTTER_VERSION: "3.19.6"
+  ANDROID_FLUTTER_VERSION: "3.13.9" # >= 3.16 is very slow on my android phone, but work well on most of others. We may switch to new flutter after changing to texture rendering (I believe it can solve my problem).
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
@@ -171,7 +171,7 @@ jobs:
                g++ \
                g++-multilib \
                imagemagick \
-               libayatana-appindicator3-dev \
+               libappindicator3-dev \
                libasound2-dev \
                libc6-dev \
                libclang-10-dev \
@@ -213,13 +213,6 @@ jobs:
         with:
           channel: "stable"
           flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
-
-      - name: Patch flutter
-        continue-on-error: true
-        run: |
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.ANDROID_FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
-  
 
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
@@ -269,12 +262,6 @@ jobs:
             exit 1
           fi
         shell: bash
-
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
-        with:
-          name: bridge-artifact
-          path: ./
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -348,7 +335,6 @@ jobs:
           sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
-          sed -i -e 's|Made with heart in this chaotic world!|${{ fromJson(inputs.extras).slogan }}|' ./src/lang/en.rs
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
           sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
           sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
@@ -375,8 +361,6 @@ jobs:
           sed -i '/adaptive_icon_background/a \ \ adaptive_icon_foreground: "../res/icon.png"' ./flutter/pubspec.yaml
           sed -i '/adaptive_icon_foreground:/a \ \ adaptive_icon_foreground_inset: 32' ./flutter/pubspec.yaml
           sed -i '/ic_launcher_background/d' ./flutter/android/app/src/main/res/values/colors.xml
-          cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
-          sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
       - name: fix connection delay
         continue-on-error: true

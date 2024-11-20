@@ -167,7 +167,17 @@ def generator_view(request):
             elif platform == 'android':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-android.yml/dispatches'
             else:
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-windows.yml/dispatches'
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/generator-windows.yml/dispatches'
+            ####breaking changes were made in 1.3.3 version, so if 1.3.2 or lower, use:
+            if version == '1.3.2' or version == '1.3.1' or version == '1.3.0':
+                if platform == 'windows':
+                    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/pre133-generator-windows.yml/dispatches' 
+                elif platform == 'linux':
+                    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/pre133-generator-linux.yml/dispatches'  
+                elif platform == 'android':
+                    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/pre133-generator-android.yml/dispatches'
+                else:
+                    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rdgen/actions/workflows/pre133-generator-windows.yml/dispatches'
 
             #url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rustdesk/actions/workflows/test.yml/dispatches'  
             data = {
@@ -327,7 +337,7 @@ def startgh(request):
     }
     response = requests.post(url, json=data, headers=headers)
     print(response)
-    return HttpResponse('')
+    return HttpResponse(status=204)
 
 def save_png(file, uuid, domain):
     file_save_path = "png/%s/%s" % (uuid, quote(file.name))
