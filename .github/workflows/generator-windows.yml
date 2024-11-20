@@ -231,8 +231,19 @@ jobs:
           flutter precache --windows
           Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
           Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
-          Move-Item -Path windows-x64-release/* -Destination C:/hostedtoolcache/windows/flutter/stable-3.24.4-x64/bin/cache/artifacts/engine/windows-x64-release/ -Force
 
+# Ensure we're in the correct directory (adjust the path as needed)
+        Set-Location "F:/actions-runner/_work/_temp"
+
+# Check if the source directory exists
+        if (Test-Path "windows-x64-release") {
+    # Move the files to the destination
+        Move-Item -Path "windows-x64-release/*" -Destination "C:/hostedtoolcache/windows/flutter/stable-3.24.4-x64/bin/cache/artifacts/engine/windows-x64-release/" -Force
+        } else {
+          Write-Host "Source directory 'windows-x64-release' does not exist."
+        }
+          
+         
       - name: Patch flutter
         continue-on-error: true
         shell: bash
