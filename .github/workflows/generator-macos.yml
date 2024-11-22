@@ -50,7 +50,7 @@ env:
 
 jobs:
   build-macos:
-    runs-on: self-hosted
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - name: Update build status
         continue-on-error: true
@@ -58,6 +58,13 @@ jobs:
           curl -X POST ${{ env.STATUS_URL }} \
           -H "Content-Type: application/json" \
           -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
+
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - uses: actions/checkout@v3
         with:
@@ -72,15 +79,10 @@ jobs:
           targets: aarch64-apple-darwin
 
       - name: Install Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.12.0
         with:
+          channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-
-      - name: Install dependencies
-        run: |
-          brew install nasm yasm pkg-config cmake
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
 
       - name: Download custom assets
         if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
@@ -105,70 +107,16 @@ jobs:
         run: |
           echo -n "${{ env.CUSTOM }}" | base64 -d > custom.txt
 
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2.12.0
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-
-      - name: Install dependencies
+      - name: Build rustdesk
         run: |
-          brew install nasm yasm pkg-config cmake
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+          ./build.py --flutter --hwcodec
 
-      - name: Download custom assets
-        if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
-        run: |
-          mkdir -p src/ui/flutter/assets
-          if [ "${{ inputs.iconlink }}" != "false" ]; then
-            ICON_JSON='${{ inputs.iconlink }}'
-            ICON_URL=$(echo $ICON_JSON | jq -r '.url')
-            ICON_UUID=$(echo $ICON_JSON | jq -r '.uuid')
-            ICON_FILE=$(echo $ICON_JSON | jq -r '.file')
-            curl -o src/ui/flutter/assets/icon.png "$ICON_URL/png/$ICON_UUID/$ICON_FILE"
-          fi
-          if [ "${{ inputs.logolink }}" != "false" ]; then
-            LOGO_JSON='${{ inputs.logolink }}'
-            LOGO_URL=$(echo $LOGO_JSON | jq -r '.url')
-            LOGO_UUID=$(echo $LOGO_JSON | jq -r '.uuid')
-            LOGO_FILE=$(echo $LOGO_JSON | jq -r '.file')
-            curl -o src/ui/flutter/assets/logo.png "$LOGO_URL/png/$LOGO_UUID/$LOGO_FILE"
-          fi
-
-      - name: Create custom.txt file
-        run: |
-          echo -n "${{ env.CUSTOM }}" | base64 -d > src/custom.txt
-
-      - name: Replace engine with rustdesk custom flutter engine
-        run: |
-          flutter doctor -v
-          flutter precache --macos
-          curl -L -o macos-arm64-release.zip https://github.com/rustdesk/engine/releases/download/main/macos-arm64-release.zip
-          unzip macos-arm64-release.zip
-          mv macos-arm64-release/* "$FLUTTER_ROOT/bin/cache/artifacts/engine/darwin-arm64-release/"
-
-      - name: Patch flutter
-        continue-on-error: true
-        run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
-
-      - name: Fix connection delay
-        if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
-        run: |
-          sed -i '' -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
-
-      - name: Build macOS App
-        run: |
-          cd src/ui/flutter
-          flutter pub get
-          flutter build macos --release
-          cd ../../../
-          mkdir -p ./SignOutput
-          
       - name: Create DMG
         run: |
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          
           cd flutter/build/macos/Build/Products/Release
           if [ "${{ inputs.appname }}" != "" ]; then
             mv "RustDesk.app" "${{ inputs.appname }}.app"
@@ -176,9 +124,11 @@ jobs:
           else
             APP_NAME="RustDesk"
           fi
-          hdiutil create -volname "$APP_NAME" -srcfolder "$APP_NAME.app" -ov -format UDZO "${{ inputs.filename }}.dmg"
-          mv "${{ inputs.filename }}.dmg" ../../../../../../SignOutput/
           
+          create-dmg --icon "$APP_NAME.app" 200 190 --hide-extension "$APP_NAME.app" --window-size 800 400 --app-drop-link 600 185 "${{ inputs.filename }}.dmg" ./"$APP_NAME.app"
+          mkdir -p ../../../../../../SignOutput/
+          mv "${{ inputs.filename }}.dmg" ../../../../../../SignOutput/
+
       - name: Sign DMG
         if: env.MACOS_P12_BASE64 != ''
         env:
@@ -191,7 +141,7 @@ jobs:
           security unlock-keychain -p mysecretpassword build.keychain
           security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
-          /usr/bin/codesign --force -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg"
+          codesign --force --options runtime -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg" -vvv
 
       - name: Upload to FTP
         if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
