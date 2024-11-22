@@ -39,9 +39,6 @@ env:
   RUST_VERSION: "1.75"
   FLUTTER_VERSION: "3.19.6"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  TAG_NAME: "${{ inputs.upload-tag }}"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
@@ -49,7 +46,6 @@ env:
   UUIDFOLDER: "${{ inputs.uuid }}"
   API_SERVER: "${{ inputs.apiServer }}"
   UPLOAD_ARTIFACT: 'true'
-  SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
@@ -65,6 +61,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
+          repository: 'rustdesk/rustdesk'
           ref: "${{ env.VERSION }}"
           submodules: recursive
 
@@ -72,6 +69,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-darwin
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -81,9 +79,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install nasm yasm pkg-config
+          brew install nasm yasm pkg-config cmake
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
-          rustup target add aarch64-apple-darwin
 
       - name: Download custom assets
         if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
@@ -106,7 +103,13 @@ jobs:
 
       - name: Create custom.txt file
         run: |
-          echo -n "${{ env.CUSTOM }}" | cat > ./src/custom.txt
+          echo -n "${{ env.CUSTOM }}" | base64 -d > ./src/custom.txt
+
+      - name: Generate Bridge Code
+        run: |
+          cd src/ui/flutter
+          flutter pub get
+          flutter_rust_bridge_codegen --rust-input ../../../src/bridge_generated.rs --dart-output ./lib/generated_bridge.dart
 
       - name: Build macOS App
         run: |
@@ -119,8 +122,13 @@ jobs:
       - name: Create DMG
         run: |
           cd src/ui/flutter/build/macos/Build/Products/Release
-          mv "RustDesk.app" "${{ inputs.appname }}.app"
-          hdiutil create -volname "${{ inputs.appname }}" -srcfolder "${{ inputs.appname }}.app" -ov -format UDZO "${{ inputs.filename }}.dmg"
+          if [ "${{ inputs.appname }}" != "" ]; then
+            mv "RustDesk.app" "${{ inputs.appname }}.app"
+            APP_NAME="${{ inputs.appname }}"
+          else
+            APP_NAME="RustDesk"
+          fi
+          hdiutil create -volname "$APP_NAME" -srcfolder "$APP_NAME.app" -ov -format UDZO "${{ inputs.filename }}.dmg"
           mv "${{ inputs.filename }}.dmg" ../../../../../../../SignOutput/
 
       - name: Sign DMG
@@ -135,23 +143,27 @@ jobs:
           security unlock-keychain -p mysecretpassword build.keychain
           security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
-          codesign --force -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg"
+          /usr/bin/codesign --force -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload to FTP
+        if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          name: ${{ inputs.filename }}
-          path: ./SignOutput/${{ inputs.filename }}.dmg
+          server: ${{ secrets.GEN_FTP_SERVER }}
+          username: ${{ secrets.GEN_FTP_USER }}
+          password: ${{ secrets.GEN_FTP_PASSWORD }}
+          local-dir: ./SignOutput/
+          server-dir: exe/${{ env.UUIDFOLDER }}/
 
       - name: Update build status
         if: always()
         continue-on-error: true
         run: |
           if [ ${{ job.status }} == "success" ]; then
-            STATUS="Build completed successfully"
+            STATUS="Success"
           else
             STATUS="Build failed"
           fi
           curl -X POST ${{ env.STATUS_URL }} \
           -H "Content-Type: application/json" \
-          -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"$STATUS\"}" 
+          -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"$STATUS\"}"
