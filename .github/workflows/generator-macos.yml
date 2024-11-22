@@ -54,7 +54,7 @@ env:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    runs-on: self-hosted
     steps:
       - name: Update build status
         continue-on-error: true
