@@ -182,7 +182,6 @@ jobs:
           sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
-          sed -i -e 's|Made with heart in this chaotic world!|${{ fromJson(inputs.extras).slogan }}|' ./src/lang/en.rs
           sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
           sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
           sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
@@ -192,8 +191,6 @@ jobs:
           sed -i -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
           sed -i -e '/const KEY:/,/};/d' ./src/common.rs
           sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
-          cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
-          sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -214,12 +211,6 @@ jobs:
           channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
-
-      - name: Install RustUp
-        shell: bash
-        run: |
-          curl --proto   -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.75 -y
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -374,7 +365,7 @@ jobs:
           python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
           Remove-Item -Path usbmmidd_v2\Win32 -Recurse
           Remove-Item -Path "usbmmidd_v2\deviceinstaller64.exe", "usbmmidd_v2\deviceinstaller.exe", "usbmmidd_v2\usbmmidd.bat"
-          Move-Item -Path "F:\actions-runner\_work\creator\creator\flutter\build\windows\x64\runner\Release" -Destination "F:\actions-runner\_work\creator\creator\flutter\rustdesk" -Force
+          mv ./flutter/build/windows/x64/runner/Release ./rustdesk
           mv -Force .\usbmmidd_v2 ./rustdesk
 
       # - name: logo stuff
