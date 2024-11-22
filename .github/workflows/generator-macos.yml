@@ -37,7 +37,7 @@ on:
 env:
   SCITER_RUST_VERSION: "1.75"
   RUST_VERSION: "1.75"
-  FLUTTER_VERSION: "3.22.3"
+  FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   RS_PUB_KEY: "${{ inputs.key }}"
@@ -118,6 +118,12 @@ jobs:
       - name: Create custom.txt file
         run: |
           echo -n "${{ env.CUSTOM }}" | base64 -d > src/custom.txt
+
+      - name: Patch Flutter Dependencies
+        run: |
+          cd flutter
+          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
+          flutter pub get    
 
       - name: Build rustdesk
         run: |
