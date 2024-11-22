@@ -107,22 +107,40 @@ jobs:
 
       - name: Setup Flutter project
         run: |
+          # Remove existing flutter directory if it exists
+          rm -rf flutter
+          
+          # Clone the Flutter repository
           git clone https://github.com/rustdesk/rustdesk-flutter.git flutter
-          cd flutter
-          cp ../custom.txt .
-          if [ -f ../flutter/assets/icon.png ]; then
-            cp ../flutter/assets/icon.png ./assets/
+          
+          # Create assets directory if it doesn't exist
+          mkdir -p flutter/assets
+          
+          # Copy custom.txt and assets
+          cp custom.txt flutter/
+          if [ -f flutter/assets/icon.png ]; then
+            cp flutter/assets/icon.png flutter/assets/
           fi
-          if [ -f ../flutter/assets/logo.png ]; then
-            cp ../flutter/assets/logo.png ./assets/
+          if [ -f flutter/assets/logo.png ]; then
+            cp flutter/assets/logo.png flutter/assets/
           fi
+          
+          # Copy necessary files from main rustdesk repo
+          cp -r src/flutter_ffi flutter/
+          cp -r src/common flutter/
+          mkdir -p flutter/resources
+          cp -r res/* flutter/resources/
 
       - name: Generate Bridge Code
         run: |
           cd flutter
           flutter pub get
           flutter_rust_bridge_codegen --rust-input ../src/bridge_generated.rs --dart-output ./lib/generated_bridge.dart
-
+          
+          # Copy the generated bridge file to the correct location
+          mkdir -p lib/generated
+          cp lib/generated_bridge.dart lib/generated/
+          
       - name: Build macOS App
         run: |
           cd flutter
