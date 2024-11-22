@@ -103,8 +103,7 @@ jobs:
 
       - name: Configure Flutter
         run: |
-          flutter config --enable-macos-desktop
-          flutter doctor -v
+          flutter config --enable-macos
           flutter clean
           flutter pub cache repair
 
