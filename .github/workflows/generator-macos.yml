@@ -109,7 +109,7 @@ jobs:
 
       - name: Build rustdesk
         run: |
-          ./build.py --flutter --hwcodec
+          ./build.py --flutter
 
       - name: Create DMG
         run: |
