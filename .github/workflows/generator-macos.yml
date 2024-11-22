@@ -83,6 +83,23 @@ jobs:
         with:
           channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          brew install nasm yasm pkg-config cmake
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+
+      - name: Generate Bridge Code
+        run: |
+          # Create bridge file directory
+          mkdir -p src/
+          
+          # Generate bridge code
+          flutter_rust_bridge_codegen \
+            --rust-input src/bridge_generated.rs.in \
+            --dart-output flutter/lib/generated_bridge.dart \
+            --dart-decl-output flutter/lib/bridge_generated.dart \
+            --rust-output src/bridge_generated.rs
 
       - name: Download custom assets
         if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
@@ -109,7 +126,11 @@ jobs:
 
       - name: Build rustdesk
         run: |
-          ./build.py --flutter
+          # Setup Flutter project
+          flutter config --enable-macos-desktop
+          
+          # Build with bridge code
+          ./build.py --flutter --flutter-bridge-file=src/bridge_generated.rs
 
       - name: Create DMG
         run: |
