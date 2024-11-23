@@ -67,7 +67,17 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Checkout source code
+        if: ${{ env.VERSION != 'master' }}
         uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: refs/tags/${{ env.VERSION }}
+
+      - name: Checkout source code
+        if: ${{ env.VERSION == 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
@@ -75,13 +85,10 @@ jobs:
           name: bridge-artifact
           path: ./
 
+          
       - name: Build rustdesk
         run: |
-          # Ensure we're in the repository root directory
-          pwd
-          ls -la
-          chmod +x ./build.py
-          ./build.py --flutter --hwcodec
+           ./build.py --flutter
 
       - name: create unsigned dmg
         if: env.UPLOAD_ARTIFACT == 'true'
