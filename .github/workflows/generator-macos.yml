@@ -37,7 +37,7 @@ on:
 env:
   SCITER_RUST_VERSION: "1.75"
   RUST_VERSION: "1.75"
-  FLUTTER_VERSION: "3.19.6"
+  FLUTTER_VERSION: "3.24.4"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   RS_PUB_KEY: "${{ inputs.key }}"
