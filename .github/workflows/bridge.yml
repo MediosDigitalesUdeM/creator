@@ -93,11 +93,16 @@ jobs:
         shell: bash
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-          pushd flutter && flutter pub get && popd
-
+          cd src/ui/flutter  # Change directory to the Flutter project root
+          flutter pub get
+          cd ../../..
+          
       - name: Run flutter rust bridge
         run: |
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
+          ~/.cargo/bin/flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./src/ui/flutter/lib/generated_bridge.dart \
+            --c-output ./src/ui/flutter/macos/Runner/bridge_generated.h
 
       - name: Upload Artifact
         uses: actions/upload-artifact@master
@@ -106,5 +111,6 @@ jobs:
           path: |
             ./src/bridge_generated.rs
             ./src/bridge_generated.io.rs
-            ./flutter/lib/generated_bridge.dart
-            ./flutter/lib/generated_bridge.freezed.dart
+            ./src/ui/flutter/lib/generated_bridge.dart
+            ./src/ui/flutter/lib/generated_bridge.freezed.dart
+            ./src/ui/flutter/macos/Runner/bridge_generated.h
