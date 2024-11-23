@@ -67,6 +67,12 @@ jobs:
           -H "Content-Type: application/json" \
           -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
 
+       - uses: actions/checkout@v3
+        with:
+          repository: 'rustdesk/rustdesk'
+          ref: "${{ env.VERSION }}"
+          submodules: recursive
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -84,13 +90,7 @@ jobs:
         run: |
           brew install nasm yasm pkg-config cmake create-dmg ninja
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
-
-      - uses: actions/checkout@v3
-        with:
-          repository: 'rustdesk/rustdesk'
-          ref: "${{ env.VERSION }}"
-          submodules: recursive
-
+      
       - name: Restore bridge files
         uses: actions/download-artifact@master
         with:
