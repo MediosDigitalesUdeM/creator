@@ -75,13 +75,6 @@ jobs:
         with:
           prefix-key: bridge-${{ matrix.job.os }}
 
-      - name: Cache Bridge
-        id: cache-bridge
-        uses: actions/cache@v3
-        with:
-          path: /tmp/flutter_rust_bridge
-          key: vcpkg-${{ matrix.job.arch }}
-
       - name: Install flutter
         uses: subosito/flutter-action@v2
         with:
@@ -93,7 +86,10 @@ jobs:
         shell: bash
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-          cd src/ui/flutter  # Change directory to the Flutter project root
+
+      - name: Setup Flutter project
+        run: |
+          cd src/ui/flutter
           flutter pub get
           cd ../../..
 
