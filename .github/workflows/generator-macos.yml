@@ -37,7 +37,7 @@ on:
 env:
   SCITER_RUST_VERSION: "1.75"
   RUST_VERSION: "1.75"
-  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.19.6"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   RS_PUB_KEY: "${{ inputs.key }}"
@@ -47,6 +47,8 @@ env:
   API_SERVER: "${{ inputs.apiServer }}"
   UPLOAD_ARTIFACT: 'true'
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
+  SLOGAN: "${{ fromJson(inputs.extras).slogan }}"
+
 
 jobs:
   generate-bridge:
@@ -103,11 +105,11 @@ jobs:
 
       - name: Configure Flutter
         run: |
-          lutter config --enable-macos-desktop
+          flutter config --enable-macos-desktop
           flutter doctor -v
           flutter clean
           flutter pub cache repair
-          
+
       - name: Download custom assets
         if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
         run: |
@@ -155,7 +157,7 @@ jobs:
           cd flutter
           flutter build macos --release --no-tree-shake-icons
           cd ..
-          
+
       - name: Create DMG
         run: |
           CREATE_DMG="$(command -v create-dmg)"
