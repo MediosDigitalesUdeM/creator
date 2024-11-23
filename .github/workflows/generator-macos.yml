@@ -49,6 +49,10 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
   SLOGAN: "${{ fromJson(inputs.extras).slogan }}"
 
+jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+
 build-for-macOS-arm64-selfhost:
     # use build-for-macOS instead
     if: false
