@@ -77,6 +77,10 @@ jobs:
 
       - name: Build rustdesk
         run: |
+          # Ensure we're in the repository root directory
+          pwd
+          ls -la
+          chmod +x ./build.py
           ./build.py --flutter --hwcodec
 
       - name: create unsigned dmg
