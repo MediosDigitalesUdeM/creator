@@ -52,9 +52,10 @@ env:
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
+    with:
+      version: ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
 
   build-for-macOS:
-    if: false
     runs-on: [self-hosted, macOS, ARM64]
     needs: [generate-bridge]
     steps:
