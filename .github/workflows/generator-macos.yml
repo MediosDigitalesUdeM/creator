@@ -67,7 +67,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
 
-       - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           repository: 'rustdesk/rustdesk'
           ref: "${{ env.VERSION }}"
