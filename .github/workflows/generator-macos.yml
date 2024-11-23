@@ -67,12 +67,23 @@ jobs:
           -H "Content-Type: application/json" \
           -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
 
-      - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-darwin
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2.12.0
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          brew install nasm yasm pkg-config cmake create-dmg ninja
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
 
       - uses: actions/checkout@v3
         with:
@@ -86,77 +97,19 @@ jobs:
           name: bridge-artifact
           path: ./
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          targets: aarch64-apple-darwin
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2.12.0
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          brew install nasm yasm pkg-config cmake create-dmg
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
-
-      - name: Configure Flutter
-        run: |
-          flutter config --enable-macos-desktop
-          flutter doctor -v
-          flutter clean
-          flutter pub cache repair
-
-      - name: Download custom assets
-        if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
-        run: |
-          mkdir -p flutter/assets
-          if [ "${{ inputs.iconlink }}" != "false" ]; then
-            ICON_JSON='${{ inputs.iconlink }}'
-            ICON_URL=$(echo $ICON_JSON | jq -r '.url')
-            ICON_UUID=$(echo $ICON_JSON | jq -r '.uuid')
-            ICON_FILE=$(echo $ICON_JSON | jq -r '.file')
-            curl -o flutter/assets/icon.png "$ICON_URL/png/$ICON_UUID/$ICON_FILE"
-          fi
-          if [ "${{ inputs.logolink }}" != "false" ]; then
-            LOGO_JSON='${{ inputs.logolink }}'
-            LOGO_URL=$(echo $LOGO_JSON | jq -r '.url')
-            LOGO_UUID=$(echo $LOGO_JSON | jq -r '.uuid')
-            LOGO_FILE=$(echo $LOGO_JSON | jq -r '.file')
-            curl -o flutter/assets/logo.png "$LOGO_URL/png/$LOGO_UUID/$LOGO_FILE"
-          fi
-
-      - name: Create custom.txt file
-        run: |
-          echo -n "${{ env.CUSTOM }}" | base64 -d > src/custom.txt
-
-      - name: Update Slogan
-        if: env.SLOGAN != ''
-        run: |
-          find . -type f -name "*.rs" -exec sed -i '' "s|Connecting the world|${{ env.SLOGAN }}|g" {} +
-
       - name: Setup Flutter project
         run: |
-          cd flutter
-          rm -rf build
+          cd src/ui/flutter
           flutter clean
-          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
           flutter pub get
-          flutter pub upgrade
-          cd ..
+          flutter config --enable-macos-desktop
+          cd ../../..
 
       - name: Build rustdesk
         run: |
-          # Clean any previous builds
-          rm -rf build
-          
-          # Build with specific flags
-          cd flutter
+          cd src/ui/flutter
           flutter build macos --release --no-tree-shake-icons
-          cd ..
+          cd ../../..
 
       - name: Create DMG
         run: |
@@ -164,7 +117,7 @@ jobs:
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
           
-          cd flutter/build/macos/Build/Products/Release
+          cd src/ui/flutter/build/macos/Build/Products/Release
           if [ "${{ inputs.appname }}" != "" ]; then
             mv "RustDesk.app" "${{ inputs.appname }}.app"
             APP_NAME="${{ inputs.appname }}"
@@ -172,10 +125,16 @@ jobs:
             APP_NAME="RustDesk"
           fi
           
-          create-dmg --icon "$APP_NAME.app" 200 190 --hide-extension "$APP_NAME.app" --window-size 800 400 --app-drop-link 600 185 "${{ inputs.filename }}.dmg" ./"$APP_NAME.app"
-          mkdir -p ../../../../../../SignOutput/
-          mv "${{ inputs.filename }}.dmg" ../../../../../../SignOutput/
-          
+          create-dmg \
+            --icon "$APP_NAME.app" 200 190 \
+            --hide-extension "$APP_NAME.app" \
+            --window-size 800 400 \
+            --app-drop-link 600 185 \
+            "${{ inputs.filename }}.dmg" \
+            ./"$APP_NAME.app"
+          mkdir -p ../../../../../../../../SignOutput/
+          mv "${{ inputs.filename }}.dmg" ../../../../../../../../SignOutput/
+
       - name: Sign DMG
         if: env.MACOS_P12_BASE64 != ''
         env:
