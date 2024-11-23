@@ -67,107 +67,152 @@ jobs:
           -H "Content-Type: application/json" \
           -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
 
-      - uses: actions/checkout@v3
+       name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
         with:
-          repository: 'rustdesk/rustdesk'
-          ref: "${{ env.VERSION }}"
-          submodules: recursive
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Checkout source code
+        uses: actions/checkout@v3
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-          targets: aarch64-apple-darwin
+          ref: ${{ matrix.job.ref }}
+          
+      - name: Import the codesign cert
+        if: env.MACOS_P12_BASE64 != null
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+          keychain: rustdesk
 
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2.12.0
+      - name: Check sign and import sign key
+        if: env.MACOS_P12_BASE64 != null
+        run: |
+          security default-keychain -s rustdesk.keychain
+          security find-identity -v
+
+      - name: Import notarize key
+        if: env.MACOS_P12_BASE64 != null
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          # https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_rcodesign.html#notarizing-and-stapling
+          fileName: rustdesk.json
+          fileDir: ${{ github.workspace }}
+          encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
+
+      - name: Install rcodesign tool
+        if: env.MACOS_P12_BASE64 != null
+        shell: bash
+        run: |
+          pushd /tmp
+          wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
+          tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
+          mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
+          popd
+
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
+
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          flutter-version: ${{ matrix.job.flutter }}
 
-      - name: Install dependencies
-        run: |
-          brew install nasm yasm pkg-config cmake create-dmg ninja
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
-      
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
         with:
-          name: bridge-artifact
-          path: ./
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ matrix.job.target }}
+          components: "rustfmt"
 
-      - name: Setup Flutter project
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+
+      - name: Install flutter rust bridge deps
+        shell: bash
         run: |
-          cd src/ui/flutter
-          flutter clean
-          flutter pub get
-          flutter config --enable-macos-desktop
-          cd ../../..
+          sed -i '' 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
+          cargo install flutter_rust_bridge_codegen --version ${{ matrix.job.bridge }} --features "uuid"
+          # below works for mac to make buildable on 3.13.9
+          # pushd flutter/lib; find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}; popd;
+          pushd flutter && flutter pub get && popd
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Install vcpkg dependencies
+        run: |
+          $VCPKG_ROOT/vcpkg install --x-install-root="$VCPKG_ROOT/installed"
+          
+      - name: Restore from cache and install vcpkg
+        uses: lukka/run-vcpkg@v7
+        if: false
+        with:
+          setupOnly: true
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Install vcpkg dependencies
+        if: false
+        run: |
+          $VCPKG_ROOT/vcpkg install libvpx libyuv opus aom
+
+      - name: Show version information (Rust, cargo, Clang)
+        shell: bash
+        run: |
+          clang --version || true
+          rustup -V
+          rustup toolchain list
+          rustup default
+          cargo -V
+          rustc -V
 
       - name: Build rustdesk
         run: |
-          cd src/ui/flutter
-          flutter build macos --release --no-tree-shake-icons
-          cd ../../..
+          ./build.py --flutter ${{ matrix.job.extra-build-args }}
 
-      - name: Create DMG
+      - name: create unsigned dmg
         run: |
           CREATE_DMG="$(command -v create-dmg)"
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
-          
-          cd src/ui/flutter/build/macos/Build/Products/Release
-          if [ "${{ inputs.appname }}" != "" ]; then
-            mv "RustDesk.app" "${{ inputs.appname }}.app"
-            APP_NAME="${{ inputs.appname }}"
-          else
-            APP_NAME="RustDesk"
-          fi
-          
-          create-dmg \
-            --icon "$APP_NAME.app" 200 190 \
-            --hide-extension "$APP_NAME.app" \
-            --window-size 800 400 \
-            --app-drop-link 600 185 \
-            "${{ inputs.filename }}.dmg" \
-            ./"$APP_NAME.app"
-          mkdir -p ../../../../../../../../SignOutput/
-          mv "${{ inputs.filename }}.dmg" ../../../../../../../../SignOutput/
+          create-dmg --icon "RustDesk.app" 200 190 --hide-extension "RustDesk.app" --window-size 800 400 --app-drop-link 600 185 rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/RustDesk.app
 
-      - name: Sign DMG
-        if: env.MACOS_P12_BASE64 != ''
-        env:
-          MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-          MACOS_P12_PASSWORD: "${{ secrets.MACOS_P12_PASSWORD }}"
+      - name: Codesign app and create signed dmg
+        if: env.MACOS_P12_BASE64 != null
         run: |
-          echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
-          security create-keychain -p mysecretpassword build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p mysecretpassword build.keychain
-          security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
-          codesign --force --options runtime -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg" -vvv
+          # Patch create-dmg to give more attempts to unmount image
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          # Unlock keychain
+          security default-keychain -s rustdesk.keychain
+          security unlock-keychain -p ${{ secrets.MACOS_P12_PASSWORD }} rustdesk.keychain
+          # start sign the rustdesk.app and dmg
+          rm -rf *.dmg || true
+          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict ./flutter/build/macos/Build/Products/Release/RustDesk.app -vvv
+          create-dmg --icon "RustDesk.app" 200 190 --hide-extension "RustDesk.app" --window-size 800 400 --app-drop-link 600 185 rustdesk-${{ env.VERSION }}.dmg ./flutter/build/macos/Build/Products/Release/RustDesk.app
+          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict rustdesk-${{ env.VERSION }}.dmg -vvv
+          # notarize the rustdesk-${{ env.VERSION }}.dmg
+          rcodesign notary-submit --api-key-path ${{ github.workspace }}/rustdesk.json  --staple rustdesk-${{ env.VERSION }}.dmg
 
-      - name: Upload to FTP
-        if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Rename rustdesk
+        run: |
+          for name in rustdesk*??.dmg; do
+              mv "$name" "${name%%.dmg}-${{ matrix.job.arch }}-flutter${{ matrix.job.flutter }}-flutter${{ matrix.job.date }}.dmg"
+          done
+
+      - name: Publish DMG package
+        uses: softprops/action-gh-release@v1
         with:
-          server: ${{ secrets.GEN_FTP_SERVER }}
-          username: ${{ secrets.GEN_FTP_USER }}
-          password: ${{ secrets.GEN_FTP_PASSWORD }}
-          local-dir: ./SignOutput/
-          server-dir: exe/${{ env.UUIDFOLDER }}/
-
-      - name: Update build status
-        if: always()
-        continue-on-error: true
-        run: |
-          if [ ${{ job.status }} == "success" ]; then
-            STATUS="Success"
-          else
-            STATUS="Build failed"
-          fi
-          curl -X POST ${{ env.STATUS_URL }} \
-          -H "Content-Type: application/json" \
-          -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"$STATUS\"}"
+          prerelease: true
+          tag_name: ${{ env.TAG_NAME }}
+          files: |
+            rustdesk*-${{ matrix.job.arch }}*.dmg
