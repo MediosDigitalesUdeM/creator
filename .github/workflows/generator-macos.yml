@@ -53,8 +53,7 @@ jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
 
-    build-for-macOS:
-    # use build-for-macOS instead
+  build-for-macOS:
     if: false
     runs-on: [self-hosted, macOS, ARM64]
     needs: [generate-bridge]
