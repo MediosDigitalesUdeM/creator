@@ -57,7 +57,7 @@ jobs:
 
   build-macos:
     needs: generate-bridge
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ${{ matrix.job.os }}
     steps:
       - name: Update build status
         continue-on-error: true
