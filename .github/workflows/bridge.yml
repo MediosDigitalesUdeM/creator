@@ -96,7 +96,7 @@ jobs:
           cd src/ui/flutter  # Change directory to the Flutter project root
           flutter pub get
           cd ../../..
-          
+
       - name: Run flutter rust bridge
         run: |
           ~/.cargo/bin/flutter_rust_bridge_codegen \
