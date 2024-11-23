@@ -56,7 +56,7 @@ jobs:
       version: ${{ fromJson(inputs.extras).version }}
       
   build-for-macOS:
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: macos-latest
     needs: [generate-bridge]
     steps:
       - name: Export GitHub Actions cache environment variables
