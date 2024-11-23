@@ -103,10 +103,11 @@ jobs:
 
       - name: Configure Flutter
         run: |
-          flutter config --enable-macos
+          lutter config --enable-macos-desktop
+          flutter doctor -v
           flutter clean
           flutter pub cache repair
-
+          
       - name: Download custom assets
         if: ${{ inputs.iconlink != 'false' || inputs.logolink != 'false' }}
         run: |
