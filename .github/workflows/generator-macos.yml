@@ -67,7 +67,7 @@ jobs:
           -H "Content-Type: application/json" \
           -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
 
-       name: Export GitHub Actions cache environment variables
+      - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
           script: |
