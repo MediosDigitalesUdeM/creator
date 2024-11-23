@@ -56,7 +56,7 @@ jobs:
       version: ${{ fromJson(inputs.extras).version }}
       
   build-for-macOS:
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64]
     needs: [generate-bridge]
     steps:
       - name: Export GitHub Actions cache environment variables
@@ -82,13 +82,17 @@ jobs:
       - name: Install dependencies
         run: |
           brew install nasm yasm pkg-config cmake create-dmg ninja
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
+        with:
+          name: bridge-artifact
+          path: ./
 
       - name: Setup Flutter project
         run: |
           cd flutter
           flutter clean
-          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.1.0/' pubspec.yaml
           flutter pub get
           flutter config --enable-macos-desktop
           cd ..
