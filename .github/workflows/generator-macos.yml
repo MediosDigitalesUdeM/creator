@@ -94,7 +94,7 @@ jobs:
 
   build-for-macOS:
     name: ${{ matrix.job.target }}
-    runs-on: self-hosted
+    runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
     strategy:
       fail-fast: false
