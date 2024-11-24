@@ -14,7 +14,8 @@ on:
 env:
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  RUST_VERSION: "1.81" # https://github.com/rustdesk/rustdesk/discussions/7503
+  RUST_VERSION: "1.81"
+  MAC_RUST_VERSION: "1.81"
 
 jobs:
   generate_bridge:
@@ -29,14 +30,16 @@ jobs:
               extra-build-args: "",
             }
           - {
-              target: aarch64-apple-darwin,
-              os: macos-14, #macos-latest or macos-14 use M1 now, https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#:~:text=14%20GB-,macos%2Dlatest%20or%20macos%2D14,-The%20macos%2Dlatestlabel
+              target: x86_64-apple-darwin,
+              os: macos-13,
               extra-build-args: "",
-              arch: aarch64,
-              flutter: "3.13.9",
-              ref: "f6509e3fd6917aa976bad2fc684182601ebf2434",
-              bridge: "1.80.1",
-              date: "20231219"
+              arch: x86_64
+            }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-14,
+              extra-build-args: "",
+              arch: arm64
             }
     steps:
       - name: Checkout source code
@@ -104,14 +107,12 @@ jobs:
           cache: true
 
       - name: Install flutter rust bridge deps
-        if: runner.os == 'macOS'
         shell: bash
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter && sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
 
       - name: Run flutter rust bridge
-        if: runner.os == 'Linux'
         run: |
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
