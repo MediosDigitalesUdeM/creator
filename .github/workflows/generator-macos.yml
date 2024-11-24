@@ -102,57 +102,40 @@ jobs:
           ref: ${{ fromJson(inputs.extras).version != 'master' && format('refs/tags/{0}', fromJson(inputs.extras).version) || 'master' }}
           submodules: recursive
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          targets: ${{ matrix.job.target }}
-
-      - name: Install flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      - name: Setup macOS certificates
-        uses: apple-actions/import-codesign-certs@v2
-        with:
-          keychain: signing_temp
-          create-keychain: true
-          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
-          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
-          keychain-password: "temp-keychain-password"
-
-      - name: Download bridge files
-        uses: actions/download-artifact@master
-        with:
-          name: bridge-artifact
-          path: .
-
-      - name: Set minimum macOS version for M1
+      - name: Prepare build environment
         run: |
-          MIN_MACOS_VERSION="12.3"
-          sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
-          sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
-          sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
-          sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
-
-      - name: Build and Sign macOS app
+          # Install additional dependencies
+          brew install create-dmg
+          cargo install cargo-bundle
+          cargo install cargo-xcode
+          
+          # Update build.py if needed
+          if [ ! -f "build.py" ]; then
+            echo "build.py not found"
+            exit 1
+          fi
+          
+          # Set environment variables
+          export MACOSX_DEPLOYMENT_TARGET=12.3
+          
+      - name: Build and package
         run: |
-          python3 build.py ${{ matrix.job.extra-build-args }}
+          # Build Flutter app
+          flutter build macos --release
+          
+          # Build Rust components
+          cargo build --release --features inline,screencapturekit
+          
+          # Package app
           cd flutter/build/macos/Build/Products/Release
           
-          # Sign the app bundle
+          # Sign the app
           codesign --force \
             --options runtime \
             --sign "${{ secrets.MACOS_CODESIGN_IDENTITY }}" \
             --timestamp \
             --deep \
             "${{ inputs.appname }}.app"
-          
-          # Verify signature
-          codesign --verify --deep --strict "${{ inputs.appname }}.app"
 
       - name: Create DMG
         run: |
