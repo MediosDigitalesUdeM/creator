@@ -56,7 +56,7 @@ jobs:
       - name: Install macOS prerequisites
         if: runner.os == 'macOS'
         run: |
-          brew install nasm cmake ninja pkg-config
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
 
       # Common prerequisites for Linux
       - name: Install Linux prerequisites
