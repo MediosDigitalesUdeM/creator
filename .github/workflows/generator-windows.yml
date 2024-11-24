@@ -107,8 +107,7 @@ jobs:
   build-for-windows-flutter:
     name: Build Windows
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
-    runs-on: self-hosted
-    strategy:
+    runs-on: windows-2022
       fail-fast: false
       matrix:
         job:
