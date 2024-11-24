@@ -140,7 +140,7 @@ jobs:
 
       - name: Build and Sign macOS app
         run: |
-          python3 build.py --flutter --flutter-build-args="--release" ${{ matrix.job.extra-build-args }}
+          python3 build.py ${{ matrix.job.extra-build-args }}
           cd flutter/build/macos/Build/Products/Release
           
           # Sign the app bundle
