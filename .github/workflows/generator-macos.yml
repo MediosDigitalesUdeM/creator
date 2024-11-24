@@ -102,40 +102,32 @@ jobs:
           ref: ${{ fromJson(inputs.extras).version != 'master' && format('refs/tags/{0}', fromJson(inputs.extras).version) || 'master' }}
           submodules: recursive
 
-      - name: Prepare build environment
+      - name: Install Rust toolchain and dependencies
         run: |
-          # Install additional dependencies
-          brew install create-dmg
+          rustup target add aarch64-apple-darwin
           cargo install cargo-bundle
           cargo install cargo-xcode
-          
-          # Update build.py if needed
-          if [ ! -f "build.py" ]; then
-            echo "build.py not found"
-            exit 1
-          fi
-          
-          # Set environment variables
-          export MACOSX_DEPLOYMENT_TARGET=12.3
-          
-      - name: Build and package
+
+      - name: Build macOS app
         run: |
-          # Build Flutter app
+          # Build using xcodebuild instead of cargo bundle
+          python3 build.py --flutter --flutter-build-args="--release" ${{ matrix.job.extra-build-args }}
+          
+          cd flutter
           flutter build macos --release
           
-          # Build Rust components
-          cargo build --release --features inline,screencapturekit
+          cd build/macos/Build/Products/Release
           
-          # Package app
-          cd flutter/build/macos/Build/Products/Release
-          
-          # Sign the app
+          # Sign the app bundle
           codesign --force \
             --options runtime \
             --sign "${{ secrets.MACOS_CODESIGN_IDENTITY }}" \
             --timestamp \
             --deep \
             "${{ inputs.appname }}.app"
+          
+          # Verify signature
+          codesign --verify --deep --strict "${{ inputs.appname }}.app"
 
       - name: Create DMG
         run: |
