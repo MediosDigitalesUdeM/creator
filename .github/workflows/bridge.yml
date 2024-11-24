@@ -37,7 +37,6 @@ jobs:
               ref: "f6509e3fd6917aa976bad2fc684182601ebf2434",
               bridge: "1.80.1",
               date: "20231219"
-              RUST_VERSION: "1.81"
             }
     steps:
       - name: Checkout source code
