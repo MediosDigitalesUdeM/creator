@@ -28,11 +28,6 @@ jobs:
               os: ubuntu-20.04,
               extra-build-args: "",
             }
-          - {
-              target: aarch64-apple-darwin,
-              os: macos-latest,
-              extra-build-args: "",
-            } 
     steps:
       - name: Checkout source code
         if: ${{ inputs.version != 'master' }}
@@ -48,7 +43,6 @@ jobs:
           repository: rustdesk/rustdesk
 
       - name: Install prerequisites
-        if: ${{ matrix.job.os == 'ubuntu-20.04' }}
         run: |
           sudo apt-get install ca-certificates -y
           sudo apt-get update -y
@@ -67,19 +61,6 @@ jobs:
             pkg-config \
             wget
 
-      - name: Install build runtime
-        if: ${{ matrix.job.os == 'macos-latest' }}
-        run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
-
-      - name: Install flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          architecture: ${{ contains(matrix.job.target, 'aarch64') && 'arm64' || 'x64' }}
-          cache: true
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -91,12 +72,6 @@ jobs:
         with:
           prefix-key: bridge-${{ matrix.job.os }}
 
-      - name: Setup Dart
-        run: |
-          flutter doctor -v
-          flutter pub get
-          dart --version
-
       - name: Cache Bridge
         id: cache-bridge
         uses: actions/cache@v3
@@ -104,7 +79,13 @@ jobs:
           path: /tmp/flutter_rust_bridge
           key: vcpkg-${{ matrix.job.arch }}
 
-     
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
