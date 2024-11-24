@@ -1,16 +1,58 @@
 name: Build RustDesk macOS
 
-on:
+on: 
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Build version'
+      server:
+        description: 'Rendezvous Server'
         required: true
-        default: '1.3.3'
-      upload-artifacts:
-        description: 'Upload artifacts'
-        type: boolean
-        default: true
+        default: ''
+        type: string
+      key:
+        description: 'Public Key'
+        required: true
+        default: ''
+        type: string
+      apiServer:
+        description: 'API Server'
+        required: true
+        default: ''
+        type: string
+      custom:
+        description: "Custom JSON"
+        required: true
+        default: ''
+        type: string
+      uuid:
+        description: "uuid of request"
+        required: true
+        default: ''
+        type: string
+      iconlink:
+        description: "icon link"
+        required: false
+        default: 'false'
+        type: string
+      logolink:
+        description: "logo link"
+        required: false
+        default: 'false'
+        type: string
+      appname:
+        description: "app name"
+        required: true
+        default: 'rustdesk'
+        type: string
+      filename:
+        description: "Filename"
+        required: true
+        default: 'rustdesk'
+        type: string
+      extras:
+        description: "extra inputs in json"
+        required: true
+        default: '{}'
+        type: string
 
 env:
   RUST_VERSION: "1.81"  # Required for macOS builds
