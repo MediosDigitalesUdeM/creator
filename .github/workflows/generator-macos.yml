@@ -118,8 +118,11 @@ jobs:
       - name: Setup macOS certificates
         uses: apple-actions/import-codesign-certs@v2
         with:
+          keychain: signing_temp
+          create-keychain: true
           p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
           p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+          keychain-password: "temp-keychain-password"
 
       - name: Download bridge files
         uses: actions/download-artifact@master
@@ -135,11 +138,21 @@ jobs:
           sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
           sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
 
-      - name: Build macOS app
+      - name: Build and Sign macOS app
         run: |
           python3 build.py --flutter --flutter-build-args="--release" ${{ matrix.job.extra-build-args }}
           cd flutter/build/macos/Build/Products/Release
-          codesign --force --options runtime --sign "${{ secrets.MACOS_CODESIGN_IDENTITY }}" ${{ inputs.appname }}.app
+          
+          # Sign the app bundle
+          codesign --force \
+            --options runtime \
+            --sign "${{ secrets.MACOS_CODESIGN_IDENTITY }}" \
+            --timestamp \
+            --deep \
+            "${{ inputs.appname }}.app"
+          
+          # Verify signature
+          codesign --verify --deep --strict "${{ inputs.appname }}.app"
 
       - name: Create DMG
         run: |
@@ -160,8 +173,15 @@ jobs:
         env:
           NOTARIZATION_JSON: ${{ secrets.MACOS_NOTARIZE_JSON }}
         run: |
-          echo "$NOTARIZATION_JSON" > notarization.json
-          xcrun notarytool submit "./flutter/build/macos/Build/Products/Release/${{ inputs.filename }}-${{ matrix.job.arch }}.dmg" \
+          # Create notarization profile
+          xcrun notarytool store-credentials "notarytool" \
+            --apple-id "${{ secrets.MACOS_NOTARIZATION_USERNAME }}" \
+            --team-id "${{ secrets.MACOS_TEAM_ID }}" \
+            --password "${{ secrets.MACOS_NOTARIZATION_PASSWORD }}"
+            
+          # Submit for notarization
+          xcrun notarytool submit \
+            "./flutter/build/macos/Build/Products/Release/${{ inputs.filename }}-${{ matrix.job.arch }}.dmg" \
             --keychain-profile "notarytool" \
             --wait
 
