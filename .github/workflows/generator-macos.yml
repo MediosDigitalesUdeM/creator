@@ -37,7 +37,7 @@ on:
 env:
   SCITER_RUST_VERSION: "1.75"
   RUST_VERSION: "1.75"
-  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.19.6"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   RS_PUB_KEY: "${{ inputs.key }}"
@@ -47,69 +47,78 @@ env:
   API_SERVER: "${{ inputs.apiServer }}"
   UPLOAD_ARTIFACT: 'true'
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
-  SLOGAN: "${{ fromJson(inputs.extras).slogan }}"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
 
 jobs:
   build-for-macOS:
     runs-on: [self-hosted, macOS, ARM64]
     steps:
-      - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Install build runtime
+      - name: Update build status
+        continue-on-error: true
         run: |
-          brew install \
-            cmake \
-            gcc \
-            pkg-config \
-            wget \
-            nasm \
-            yasm \
-            ninja \
-            create-dmg \
-            llvm \
-            pkg-config \
-            ninja-build
+          curl -X POST ${{ env.STATUS_URL }} \
+          -H "Content-Type: application/json" \
+          -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"Starting macOS build...\"}"
+
+      - name: Verify build environment
+        run: |
+          # Check installed versions
+          cmake --version
+          gcc --version
+          flutter --version
+          rustc --version
+          cargo --version
+          
+          # Verify brew packages
+          brew list | grep -E 'cmake|gcc|nasm|yasm|ninja|create-dmg|llvm'
 
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
           ref: ${{ env.VERSION != 'master' && format('refs/tags/{0}', env.VERSION) || 'master' }}
+          submodules: recursive
 
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
+      - name: Setup Flutter
+        run: |
+          flutter config --enable-macos-desktop
+          flutter clean
+          flutter doctor -v
 
-      - name: Install flutter rust bridge deps
-        shell: bash
+      - name: Generate bridge files
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-          cd flutter
-          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
-          flutter pub get
-          cd ..
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+          mkdir -p flutter/lib/generated
+          ~/.cargo/bin/flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h \
+            --dart-decl-output ./flutter/lib/generated/bridge_definitions.dart \
+            --class-name RustDesk
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
 
       - name: Setup Flutter project
         run: |
           cd flutter
-          flutter clean
-          flutter config --enable-macos-desktop
-          flutter doctor -v
+          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
           flutter pub get
           cd ..
 
+      - name: Fix connection delay
+        if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
+        run: |
+          sed -i '' -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
+
+      - name: Update slogan
+        if: ${{ fromJson(inputs.extras).slogan != '' }}
+        run: |
+          find . -type f -name "*.rs" -exec sed -i '' "s|Connecting the world|${{ fromJson(inputs.extras).slogan }}|g" {} +
+
       - name: Build rustdesk
         run: |
+          export FLUTTER_ROOT="$(dirname $(which flutter))"
+          export PATH="$FLUTTER_ROOT/bin:$PATH"
           ./build.py --flutter --hwcodec
 
       - name: Create unsigned DMG
@@ -143,17 +152,13 @@ jobs:
       - name: Sign DMG
         if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
         run: |
-          # Patch create-dmg to give more attempts to unmount image
-          CREATE_DMG="$(command -v create-dmg)"
-          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
-          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
-          # start sign the rustdesk.app and dmg
-          rm -rf *.dmg || true
-          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app -vvv
-          create-dmg --icon "${{ inputs.appname }}.app" 200 190 --hide-extension "${{ inputs.appname }}.app" --window-size 800 400 --app-drop-link 600 185 "${{ inputs.filename }}.dmg" ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
-          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict "${{ inputs.filename }}.dmg" -vvv
-          # notarize the dmg
-          rcodesign notary-submit --api-key-path ~/.p12/api-key.json --staple "${{ inputs.filename }}.dmg"
+          echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
+          security create-keychain -p mysecretpassword build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p mysecretpassword build.keychain
+          security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
+          codesign --force --options runtime -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg" -vvv
 
       - name: Upload to FTP
         if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
