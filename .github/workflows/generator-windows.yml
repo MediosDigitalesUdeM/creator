@@ -107,7 +107,7 @@ jobs:
   build-for-windows-flutter:
     name: Build Windows
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
-    runs-on: windows-2022
+    runs-on: ${{ matrix.job.os }}
       fail-fast: false
       matrix:
         job:
