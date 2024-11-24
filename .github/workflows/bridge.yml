@@ -42,7 +42,7 @@ jobs:
         with:
           repository: rustdesk/rustdesk
 
-           - name: Import the codesign cert
+      - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
         uses: apple-actions/import-codesign-certs@v1
         with:
