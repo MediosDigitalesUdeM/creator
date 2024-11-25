@@ -105,11 +105,14 @@ jobs:
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
-          sed -i${sed_ext} 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            sed_ext=" ''"
+          else
+            sed_ext=""
+          fi
+          sed -i${sed_ext} 's/3.1.0/2.17.0/g' flutter/pubspec.yaml
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter && sed -i${sed_ext} 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
-        env:
-          sed_ext: ${{ contains(matrix.job.os, 'macos') && " ''" || '' }}
 
       - name: Run flutter rust bridge
         run: |
