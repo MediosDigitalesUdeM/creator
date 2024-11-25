@@ -60,6 +60,7 @@ env:
   MAC_RUST_VERSION: "1.81"
   MACOS_MIN_VER: "12.3"
   STATUS_URL: "${{ format('https://api.rustdesk.com/status/{0}', inputs.uuid) }}"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.63.0"
 
 jobs:
   generate-bridge:
@@ -161,6 +162,50 @@ jobs:
           wget -O ./res/logo.png ${{ inputs.logolink }}
           wget -O ./res/logo.ico ${{ inputs.logolink }}
 
+      - name: Import the codesign cert
+        if: env.MACOS_P12_BASE64 != ''
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+          keychain: rustdesk
+
+      - name: Check sign and import sign key
+        if: env.MACOS_P12_BASE64 != ''
+        run: |
+          security default-keychain -s rustdesk.keychain
+          security find-identity -v
+
+      - name: Import notarize key
+        if: env.MACOS_P12_BASE64 != ''
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: rustdesk.json
+          fileDir: ${{ github.workspace }}
+          encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
+
+      - name: Install rcodesign tool
+        if: env.MACOS_P12_BASE64 != ''
+        shell: bash
+        run: |
+          pushd /tmp
+          wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
+          tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
+          mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
+          popd
+
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
+
+      - name: Install flutter rust bridge deps
+        shell: bash
+        run: |
+          sed -i '' 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+          pushd flutter && sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+
       - name: Build Generator
         env:
           RENDEZVOUS_SERVER: ${{ inputs.server }}
@@ -172,32 +217,24 @@ jobs:
 
       - name: Create DMG
         run: |
-          create-dmg \
-            --icon "${{ inputs.appname }}.app" 200 190 \
-            --hide-extension "${{ inputs.appname }}.app" \
-            --window-size 800 400 \
-            --app-drop-link 600 185 \
-            ${{ inputs.filename }}-${{ matrix.arch }}.dmg \
-            ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
+          # Patch create-dmg to give more attempts to unmount image
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          create-dmg --icon "${{ inputs.appname }}.app" 200 190 --hide-extension "${{ inputs.appname }}.app" --window-size 800 400 --app-drop-link 600 185 ${{ inputs.filename }}-${{ matrix.arch }}.dmg ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
 
       - name: Code Sign (if credentials available)
         if: env.MACOS_P12_BASE64 != ''
-        env:
-          MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
-          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
-          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
         run: |
-          # Import certificate
-          echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
-          security create-keychain -p "$MACOS_P12_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$MACOS_P12_PASSWORD" build.keychain
-          security import certificate.p12 -k build.keychain -P "$MACOS_P12_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_P12_PASSWORD" build.keychain
-          
+          # Unlock keychain
+          security default-keychain -s rustdesk.keychain
+          security unlock-keychain -p ${{ secrets.MACOS_P12_PASSWORD }} rustdesk.keychain
           # Sign app and DMG
-          codesign --force --options runtime -s "$MACOS_CODESIGN_IDENTITY" --deep ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
-          codesign --force --options runtime -s "$MACOS_CODESIGN_IDENTITY" ${{ inputs.filename }}-${{ matrix.arch }}.dmg
+          codesign --force --options runtime -s "${{ secrets.MACOS_CODESIGN_IDENTITY }}" --deep --strict ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app -vvv
+          create-dmg --icon "${{ inputs.appname }}.app" 200 190 --hide-extension "${{ inputs.appname }}.app" --window-size 800 400 --app-drop-link 600 185 ${{ inputs.filename }}-${{ matrix.arch }}.dmg ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
+          codesign --force --options runtime -s "${{ secrets.MACOS_CODESIGN_IDENTITY }}" --deep --strict ${{ inputs.filename }}-${{ matrix.arch }}.dmg -vvv
+          # Notarize the DMG
+          rcodesign notary-submit --api-key-path ${{ github.workspace }}/rustdesk.json --staple ${{ inputs.filename }}-${{ matrix.arch }}.dmg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
