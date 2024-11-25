@@ -14,8 +14,7 @@ on:
 env:
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  RUST_VERSION: "1.81"
-  MAC_RUST_VERSION: "1.81"
+  RUST_VERSION: "1.81" # Aligned with macOS workflow
 
 jobs:
   generate_bridge:
@@ -28,18 +27,6 @@ jobs:
               target: x86_64-unknown-linux-gnu,
               os: ubuntu-20.04,
               extra-build-args: "",
-            }
-          - {
-              target: x86_64-apple-darwin,
-              os: macos-13,
-              extra-build-args: "",
-              arch: x86_64
-            }
-          - {
-              target: aarch64-apple-darwin,
-              os: macos-14,
-              extra-build-args: "",
-              arch: arm64
             }
     steps:
       - name: Checkout source code
@@ -55,16 +42,9 @@ jobs:
         with:
           repository: rustdesk/rustdesk
 
-      # macOS specific prerequisites
-      - name: Install macOS prerequisites
-        if: runner.os == 'macOS'
+      - name: Install prerequisites
         run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
-
-      # Common prerequisites for Linux
-      - name: Install Linux prerequisites
-        if: runner.os == 'Linux'
-        run: |
+          sudo apt-get install ca-certificates -y
           sudo apt-get update -y
           sudo apt-get install -y \
             clang \
@@ -84,7 +64,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ runner.os == 'macOS' && env.MAC_RUST_VERSION || env.RUST_VERSION }}
+          toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
