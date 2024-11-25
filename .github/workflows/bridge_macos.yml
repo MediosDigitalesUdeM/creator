@@ -1,0 +1,81 @@
+name: Build flutter-rust-bridge MacOS
+# 2024-01-20
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Rustdesk Version'
+        required: true
+        default: '1.3.1'
+        type: string
+
+env:
+  FLUTTER_VERSION: "3.22.3"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  RUST_VERSION: "1.75"
+
+jobs:
+  generate_bridge_macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout source code
+        if: ${{ inputs.version != 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: refs/tags/${{ inputs.version }}
+        
+      - name: Checkout source code
+        if: ${{ inputs.version == 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+
+      - name: Install prerequisites
+        run: |
+          brew install cmake ninja pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+          components: "rustfmt"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bridge-macos
+
+      - name: Cache Bridge
+        id: cache-bridge
+        uses: actions/cache@v3
+        with:
+          path: /tmp/flutter_rust_bridge
+          key: macos-bridge
+
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install flutter rust bridge deps
+        shell: bash
+        run: |
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+          pushd flutter && sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
+
+      - name: Run flutter rust bridge
+        run: |
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+          cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: bridge-macos
+          path: |
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/macos/Runner/bridge_generated.h
