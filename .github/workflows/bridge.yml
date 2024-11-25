@@ -28,6 +28,16 @@ jobs:
               os: ubuntu-20.04,
               extra-build-args: "",
             }
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-13,
+              extra-build-args: "",
+            }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-14,
+              extra-build-args: "",
+            }
     steps:
       - name: Checkout source code
         if: ${{ inputs.version != 'master' }}
@@ -43,6 +53,7 @@ jobs:
           repository: rustdesk/rustdesk
 
       - name: Install prerequisites
+        if: ${{ !contains(matrix.job.os, 'macos') }}
         run: |
           sudo apt-get install ca-certificates -y
           sudo apt-get update -y
@@ -60,6 +71,11 @@ jobs:
             ninja-build \
             pkg-config \
             wget
+
+      - name: Install macOS prerequisites
+        if: ${{ contains(matrix.job.os, 'macos') }}
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -89,8 +105,11 @@ jobs:
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
+          sed -i${sed_ext} 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-          pushd flutter && sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
+          pushd flutter && sed -i${sed_ext} 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
+        env:
+          sed_ext: ${{ contains(matrix.job.os, 'macos') && " ''" || '' }}
 
       - name: Run flutter rust bridge
         run: |
