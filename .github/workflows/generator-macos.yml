@@ -49,63 +49,39 @@ on:
         default: 'rustdesk'
         type: string
       extras:
-        description: "extra inputs in json"
+        description: "Extra options in JSON format"
         required: true
         default: '{}'
         type: string
 
-
 env:
-  SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
-  RUST_VERSION: "1.81" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
-  CARGO_NDK_VERSION: "3.1.2"
-  SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
-  SCITER_NASM_DEBVERSION: "2.14-1"
-  LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
-  ANDROID_FLUTTER_VERSION: "3.13.9" # >= 3.16 is very slow on my android phone, but work well on most of others. We may switch to new flutter after changing to texture rendering (I believe it can solve my problem).
-  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  # for arm64 linux because official Dart SDK does not work
-  FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  # vcpkg version: 2024.07.12
-  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
-  VERSION: "${{ fromJson(inputs.extras).version }}"
-  NDK_VERSION: "r27b"
-  #signing keys env variable checks
-  ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
-  MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-  # To make a custom build with your own servers set the below secret values
-  RS_PUB_KEY: "${{ inputs.key }}"
-  RENDEZVOUS_SERVER: "${{ inputs.server }}"
-  CUSTOM: "${{ inputs.custom }}"
-  UUIDFOLDER: "${{ inputs.uuid }}"
-  API_SERVER: "${{ inputs.apiServer }}"
-  UPLOAD_ARTIFACT: 'true'
-  SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
-  STATUS_URL: "${{ secrets.GENURL }}/updategh"
-  
+  RUST_VERSION: "1.81"
+  MAC_RUST_VERSION: "1.81"
+  MACOS_MIN_VER: "12.3"
+  STATUS_URL: "${{ format('https://api.rustdesk.com/status/{0}', inputs.uuid) }}"
+
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
       version: ${{ fromJson(inputs.extras).version }}
 
-  build-for-macOS:
-    name: ${{ matrix.job.target }}
-    runs-on: ${{ matrix.job.os }}
+  build-macos:
     needs: [generate-bridge]
     strategy:
-      fail-fast: false
       matrix:
-        job:
-          - {
-              target: aarch64-apple-darwin,
-              os: macos-latest,
-              extra-build-args: "--screencapturekit",
-              arch: aarch64,
-            }
+        include:
+          - arch: x86_64
+            runner: macos-13
+            target: x86_64-apple-darwin
+          - arch: arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+    
+    name: Build macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -113,199 +89,126 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-      
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
-        run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $env:GITHUB_ENV
 
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
-        run: |
-          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $env:GITHUB_ENV
-
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "5% complete"}'
-
-      - name: Checkout source code
-        if: ${{ env.VERSION != 'master' }}
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          repository: rustdesk/rustdesk
-          ref: refs/tags/${{ env.VERSION }}
 
-      - name: Checkout source code
-        if: ${{ env.VERSION == 'master' }}
-        uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          repository: rustdesk/rustdesk
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Set minimum macOS version
+        run: |
+          sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MACOS_MIN_VER}/" build.py
+          sed -i -e "s/platform :osx, '.*'/platform :osx, '${MACOS_MIN_VER}'/" flutter/macos/Podfile
+          sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MACOS_MIN_VER}\"/" Cargo.toml
+          sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MACOS_MIN_VER};/" flutter/macos/Runner.xcodeproj/project.pbxproj
 
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: true
         shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
-          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
-          cp ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
-          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
-          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
-          sed -i -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"Copyright © 2024 Purslane Ltd. All rights reserved."|"Copyright © 2024"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"rustdesk.exe"|"${{ inputs.filename }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          cp ./src/lang/en.rs ./src/lang/en.rs.bak
-          sed -i -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
-          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
-          sed -i -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
-          sed -i -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
-          sed -i -e "s|const url = 'https://rustdesk.com/';|const url = '${{ fromJson(inputs.extras).urlLink }}';|" ./flutter/lib/mobile/pages/settings_page.dart
-          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
-          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
+          sed -i -e "s/name = \"rustdesk\"/name = \"${{ inputs.appname }}\"/" ./Cargo.toml
+          sed -i -e "s/RustDesk/${{ inputs.appname }}/" ./src/lang/en.rs
+          sed -i -e "s/RustDesk/${{ inputs.appname }}/" ./flutter/macos/Runner/Info.plist
+          sed -i -e "s/RustDesk/${{ inputs.appname }}/" ./flutter/macos/Runner.xcodeproj/project.pbxproj
 
-      #- name: Install LLVM and Clang
-       # uses: KyleMayes/install-llvm-action@v1
-        #with:
-         # version: ${{ env.LLVM_VERSION }}
-
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
-
-      - name: Install flutter
-        uses: subosito/flutter-action@v2.12.0 #https://github.com/subosito/flutter-action/issues/277
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.SCITER_RUST_VERSION }}
-          targets: ${{ matrix.job.target }}
-          components: "rustfmt"
-
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "15% complete"}'
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: ${{ matrix.job.os }}
-
-      - name: Install flutter rust bridge deps
+      - name: icon stuff
+        if: ${{ inputs.iconlink != 'false' }}
+        continue-on-error: true
         shell: bash
         run: |
-          git config --global core.longpaths true
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-          pushd flutter && flutter pub get && popd
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
-        
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "20% complete"}'
-          
-      - name: Build macOS app
+          mv ./res/icon.ico ./res/icon.ico.bak
+          mv ./res/icon.png ./res/icon.png.bak
+          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
+          wget -O ./res/icon.png ${{ inputs.iconlink }}
+          wget -O ./res/icon.ico ${{ inputs.iconlink }}
+          wget -O ./res/tray-icon.ico ${{ inputs.iconlink }}
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
+          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png
+
+      - name: logo stuff
+        if: ${{ inputs.logolink != 'false' }}
+        continue-on-error: true
+        shell: bash
         run: |
-          # Build using xcodebuild instead of cargo bundle
-          python3 build.py --flutter --flutter-build-args="--release" ${{ matrix.job.extra-build-args }}
-          
-          cd flutter
-          flutter build macos --release
-          
-          cd build/macos/Build/Products/Release
-          
-          # Sign the app bundle
-          codesign --force \
-            --options runtime \
-            --sign "${{ secrets.MACOS_CODESIGN_IDENTITY }}" \
-            --timestamp \
-            --deep \
-            "${{ inputs.appname }}.app"
-          
-          # Verify signature
-          codesign --verify --deep --strict "${{ inputs.appname }}.app"
+          mv ./res/logo.ico ./res/logo.ico.bak
+          mv ./res/logo.png ./res/logo.png.bak
+          wget -O ./res/logo.png ${{ inputs.logolink }}
+          wget -O ./res/logo.ico ${{ inputs.logolink }}
+
+      - name: Build Generator
+        env:
+          RENDEZVOUS_SERVER: ${{ inputs.server }}
+          RS_PUB_KEY: ${{ inputs.key }}
+          API_SERVER: ${{ inputs.apiServer }}
+          CUSTOM_JSON: ${{ inputs.custom }}
+        run: |
+          ./build.py --flutter --hwcodec
 
       - name: Create DMG
         run: |
-          cd flutter/build/macos/Build/Products/Release
           create-dmg \
-            --volname "${{ inputs.appname }}" \
-            --window-pos 200 120 \
-            --window-size 800 400 \
-            --icon-size 100 \
             --icon "${{ inputs.appname }}.app" 200 190 \
             --hide-extension "${{ inputs.appname }}.app" \
+            --window-size 800 400 \
             --app-drop-link 600 185 \
-            "${{ inputs.filename }}-${{ matrix.job.arch }}.dmg" \
-            "${{ inputs.appname }}.app"
+            ${{ inputs.filename }}-${{ matrix.arch }}.dmg \
+            ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
 
-      - name: Notarize DMG
-        if: env.MACOS_NOTARIZE_JSON != ''
+      - name: Code Sign (if credentials available)
+        if: env.MACOS_P12_BASE64 != ''
         env:
-          NOTARIZATION_JSON: ${{ secrets.MACOS_NOTARIZE_JSON }}
+          MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
+          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
         run: |
-          # Create notarization profile
-          xcrun notarytool store-credentials "notarytool" \
-            --apple-id "${{ secrets.MACOS_NOTARIZATION_USERNAME }}" \
-            --team-id "${{ secrets.MACOS_TEAM_ID }}" \
-            --password "${{ secrets.MACOS_NOTARIZATION_PASSWORD }}"
-            
-          # Submit for notarization
-          xcrun notarytool submit \
-            "./flutter/build/macos/Build/Products/Release/${{ inputs.filename }}-${{ matrix.job.arch }}.dmg" \
-            --keychain-profile "notarytool" \
-            --wait
+          # Import certificate
+          echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
+          security create-keychain -p "$MACOS_P12_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_P12_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_P12_PASSWORD" build.keychain
+          
+          # Sign app and DMG
+          codesign --force --options runtime -s "$MACOS_CODESIGN_IDENTITY" --deep ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
+          codesign --force --options runtime -s "$MACOS_CODESIGN_IDENTITY" ${{ inputs.filename }}-${{ matrix.arch }}.dmg
 
-      - name: Upload to server
-        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          server: ${{ secrets.GEN_FTP_SERVER }}
-          username: ${{ secrets.GEN_FTP_USER }}
-          password: ${{ secrets.GEN_FTP_PASSWORD }}
-          local-dir: ./flutter/build/macos/Build/Products/Release/
-          server-dir: /root/rdgen/exe/${{ env.UUIDFOLDER }}/
-          include: |
-            ${{ inputs.filename }}-${{ matrix.job.arch }}.dmg
+          name: ${{ inputs.filename }}-macos-${{ matrix.arch }}
+          path: ${{ inputs.filename }}-${{ matrix.arch }}.dmg
 
-      - name: Report Status - Success
+      - name: Report Status
+        if: always()
         uses: fjogeleit/http-request-action@v1
         with:
           url: ${{ env.STATUS_URL }}
           method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "Success"}'
-
-      - name: Report Status - Failure
-        if: failure()
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "Build failed, please try again"}'
+          data: '{"status": "${{ job.status }}", "job_type": "build", "os": "macos-${{ matrix.arch }}", "filename": "${{ inputs.filename }}-${{ matrix.arch }}.dmg"}'
