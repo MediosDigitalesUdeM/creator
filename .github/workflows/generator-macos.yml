@@ -244,4 +244,16 @@ jobs:
           name: ${{ inputs.filename || 'rustdesk' }}-macos-${{ matrix.arch }}
           path: ${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg
 
-      
+      - name: Report Status
+        if: always()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          data: >-
+            {
+              "status": "${{ job.status }}",
+              "job_type": "build",
+              "os": "macos-${{ matrix.arch }}",
+              "filename": "${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg"
+            }
