@@ -6,70 +6,61 @@ on:
       server:
         description: 'Rendezvous Server'
         required: true
-        default: ''
+        default: 'rs-ny.rustdesk.com'
         type: string
       key:
         description: 'Public Key'
         required: true
-        default: ''
+        default: 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqaSg='
         type: string
       apiServer:
         description: 'API Server'
-        required: true
-        default: ''
+        required: false
         type: string
-      custom:
-        description: "Custom JSON"
-        required: true
-        default: ''
+      customJSON:
+        description: 'Custom JSON'
+        required: false
         type: string
       uuid:
-        description: "uuid of request"
-        required: true
-        default: ''
+        description: 'UUID'
+        required: false
         type: string
       iconlink:
-        description: "icon link"
+        description: 'Icon Link'
         required: false
-        default: 'false'
         type: string
       logolink:
-        description: "logo link"
+        description: 'Logo Link'
         required: false
-        default: 'false'
         type: string
       appname:
-        description: "app name"
-        required: true
-        default: 'rustdesk'
+        description: 'App Name'
+        required: false
         type: string
       filename:
-        description: "Filename"
-        required: true
-        default: 'rustdesk'
+        description: 'File Name'
+        required: false
         type: string
       extras:
-        description: "Extra options in JSON format"
-        required: true
-        default: '{}'
+        description: 'Extras'
+        required: false
         type: string
 
 env:
   FLUTTER_VERSION: "3.24.5"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   RUST_VERSION: "1.81"
-  MAC_RUST_VERSION: "1.81"
   MACOS_MIN_VER: "12.3"
   STATUS_URL: "${{ format('https://api.rustdesk.com/status/{0}', inputs.uuid) }}"
-  FLUTTER_RUST_BRIDGE_VERSION: "1.63.0"
 
 jobs:
-  generate-bridge:
-    uses: ./.github/workflows/bridge.yml
+  bridge:
+    uses: ./.github/workflows/bridge-macos.yml
     with:
-      version: ${{ fromJson(inputs.extras).version }}
+      version: '1.3.1'
 
   build-macos:
-    needs: [generate-bridge]
+    needs: [bridge]
     strategy:
       matrix:
         include:
@@ -94,27 +85,63 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download bridge artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: bridge-macos-${{ matrix.target }}-artifact
+          path: ./
+
       - name: Install build dependencies
         run: |
           brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-
-      - name: Setup Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ env.MAC_RUST_VERSION }}
+          toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
+          components: "rustfmt"
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
+      - uses: Swatinem/rust-cache@v2
         with:
-          name: bridge-artifact
-          path: ./
+          prefix-key: macos-${{ matrix.runner }}
+
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Setup environment
+        env:
+          RUSTDESK_SERVER: ${{ inputs.server }}
+          RUSTDESK_KEY: ${{ inputs.key }}
+        run: |
+          if [[ -n "${{ inputs.apiServer }}" ]]; then
+            echo "RUSTDESK_API_SERVER=${{ inputs.apiServer }}" >> $GITHUB_ENV
+          fi
+          if [[ -n "${{ inputs.customJSON }}" ]]; then
+            echo "RUSTDESK_CUSTOM_JSON=${{ inputs.customJSON }}" >> $GITHUB_ENV
+          fi
+          if [[ -n "${{ inputs.uuid }}" ]]; then
+            echo "RUSTDESK_UUID=${{ inputs.uuid }}" >> $GITHUB_ENV
+          fi
+          if [[ -n "${{ inputs.appname }}" ]]; then
+            echo "RUSTDESK_APPNAME=${{ inputs.appname }}" >> $GITHUB_ENV
+          fi
+          if [[ -n "${{ inputs.extras }}" ]]; then
+            echo "RUSTDESK_EXTRAS=${{ inputs.extras }}" >> $GITHUB_ENV
+          fi
+
+      - name: Download resources
+        run: |
+          if [[ -n "${{ inputs.iconlink }}" ]]; then
+            wget -O ./res/mac-tray-light.png ${{ inputs.iconlink }}
+          fi
+          if [[ -n "${{ inputs.logolink }}" ]]; then
+            wget -O ./res/mac-tray-dark.png ${{ inputs.logolink }}
+          fi
 
       - name: Set minimum macOS version
         run: |
@@ -128,39 +155,33 @@ jobs:
         shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
-          sed -i -e "s/name = \"rustdesk\"/name = \"${{ inputs.appname }}\"/" ./Cargo.toml
-          sed -i -e "s/RustDesk/${{ inputs.appname }}/" ./src/lang/en.rs
-          sed -i -e "s/RustDesk/${{ inputs.appname }}/" ./flutter/macos/Runner/Info.plist
-          sed -i -e "s/RustDesk/${{ inputs.appname }}/" ./flutter/macos/Runner.xcodeproj/project.pbxproj
+          sed -i -e "s/name = \"rustdesk\"/name = \"${{ inputs.appname || 'rustdesk' }}\"/" ./Cargo.toml
+          sed -i -e "s/RustDesk/${{ inputs.appname || 'rustdesk' }}/" ./src/lang/en.rs
+          sed -i -e "s/RustDesk/${{ inputs.appname || 'rustdesk' }}/" ./flutter/macos/Runner/Info.plist
+          sed -i -e "s/RustDesk/${{ inputs.appname || 'rustdesk' }}/" ./flutter/macos/Runner.xcodeproj/project.pbxproj
 
-      - name: icon stuff
-        if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: true
-        shell: bash
+      - name: Build macOS app
         run: |
-          mv ./res/icon.ico ./res/icon.ico.bak
-          mv ./res/icon.png ./res/icon.png.bak
-          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
-          wget -O ./res/icon.png ${{ inputs.iconlink }}
-          wget -O ./res/icon.ico ${{ inputs.iconlink }}
-          wget -O ./res/tray-icon.ico ${{ inputs.iconlink }}
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
-          cp ./res/icon.png ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png
+          pushd flutter
+          flutter build macos --release
+          popd
 
-      - name: logo stuff
-        if: ${{ inputs.logolink != 'false' }}
-        continue-on-error: true
-        shell: bash
+      - name: Create DMG
         run: |
-          mv ./res/logo.ico ./res/logo.ico.bak
-          mv ./res/logo.png ./res/logo.png.bak
-          wget -O ./res/logo.png ${{ inputs.logolink }}
-          wget -O ./res/logo.ico ${{ inputs.logolink }}
+          APP_NAME="${{ inputs.appname || 'rustdesk' }}"
+          DMG_NAME="${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg"
+          
+          # Create DMG
+          create-dmg \
+            --volname "$APP_NAME" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "$APP_NAME.app" 200 190 \
+            --hide-extension "$APP_NAME.app" \
+            --app-drop-link 600 185 \
+            "$DMG_NAME" \
+            "flutter/build/macos/Build/Products/Release/$APP_NAME.app"
 
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != ''
@@ -173,6 +194,7 @@ jobs:
       - name: Check sign and import sign key
         if: env.MACOS_P12_BASE64 != ''
         run: |
+          # Unlock keychain
           security default-keychain -s rustdesk.keychain
           security find-identity -v
 
@@ -194,35 +216,6 @@ jobs:
           mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
           popd
 
-      - name: Install build runtime
-        run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
-
-      - name: Install flutter rust bridge deps
-        shell: bash
-        run: |
-          sed -i '' 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-          pushd flutter && sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
-
-      - name: Build Generator
-        env:
-          RENDEZVOUS_SERVER: ${{ inputs.server }}
-          RS_PUB_KEY: ${{ inputs.key }}
-          API_SERVER: ${{ inputs.apiServer }}
-          CUSTOM_JSON: ${{ inputs.custom }}
-        run: |
-          ./build.py --flutter --hwcodec
-
-      - name: Create DMG
-        run: |
-          # Patch create-dmg to give more attempts to unmount image
-          CREATE_DMG="$(command -v create-dmg)"
-          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
-          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
-          create-dmg --icon "${{ inputs.appname }}.app" 200 190 --hide-extension "${{ inputs.appname }}.app" --window-size 800 400 --app-drop-link 600 185 ${{ inputs.filename }}-${{ matrix.arch }}.dmg ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
-
       - name: Code Sign (if credentials available)
         if: env.MACOS_P12_BASE64 != ''
         run: |
@@ -230,17 +223,26 @@ jobs:
           security default-keychain -s rustdesk.keychain
           security unlock-keychain -p ${{ secrets.MACOS_P12_PASSWORD }} rustdesk.keychain
           # Sign app and DMG
-          codesign --force --options runtime -s "${{ secrets.MACOS_CODESIGN_IDENTITY }}" --deep --strict ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app -vvv
-          create-dmg --icon "${{ inputs.appname }}.app" 200 190 --hide-extension "${{ inputs.appname }}.app" --window-size 800 400 --app-drop-link 600 185 ${{ inputs.filename }}-${{ matrix.arch }}.dmg ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app
-          codesign --force --options runtime -s "${{ secrets.MACOS_CODESIGN_IDENTITY }}" --deep --strict ${{ inputs.filename }}-${{ matrix.arch }}.dmg -vvv
+          codesign --force --options runtime -s "${{ secrets.MACOS_CODESIGN_IDENTITY }}" --deep --strict ./flutter/build/macos/Build/Products/Release/${{ inputs.appname || 'rustdesk' }}.app -vvv
+          create-dmg \
+            --volname "${{ inputs.appname || 'rustdesk' }}" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "${{ inputs.appname || 'rustdesk' }}.app" 200 190 \
+            --hide-extension "${{ inputs.appname || 'rustdesk' }}.app" \
+            --app-drop-link 600 185 \
+            "${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg" \
+            "flutter/build/macos/Build/Products/Release/${{ inputs.appname || 'rustdesk' }}.app"
+          codesign --force --options runtime -s "${{ secrets.MACOS_CODESIGN_IDENTITY }}" --deep --strict "${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg" -vvv
           # Notarize the DMG
-          rcodesign notary-submit --api-key-path ${{ github.workspace }}/rustdesk.json --staple ${{ inputs.filename }}-${{ matrix.arch }}.dmg
+          rcodesign notary-submit --api-key-path ${{ github.workspace }}/rustdesk.json --staple "${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ inputs.filename }}-macos-${{ matrix.arch }}
-          path: ${{ inputs.filename }}-${{ matrix.arch }}.dmg
+          name: ${{ inputs.filename || 'rustdesk' }}-macos-${{ matrix.arch }}
+          path: ${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg
 
       - name: Report Status
         if: always()
@@ -248,4 +250,4 @@ jobs:
         with:
           url: ${{ env.STATUS_URL }}
           method: 'POST'
-          data: '{"status": "${{ job.status }}", "job_type": "build", "os": "macos-${{ matrix.arch }}", "filename": "${{ inputs.filename }}-${{ matrix.arch }}.dmg"}'
+          data: '{"status": "${{ job.status }}", "job_type": "build", "os": "macos-${{ matrix.arch }}", "filename": "${{ inputs.filename || 'rustdesk' }}-${{ matrix.arch }}.dmg"}'
