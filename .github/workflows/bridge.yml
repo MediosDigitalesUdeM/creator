@@ -117,9 +117,11 @@ jobs:
           pushd flutter
           sed -i${sed_ext} 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml
           flutter clean
+          rm -rf pubspec.lock
           flutter pub get
-          dart pub global activate flutter_rust_bridge_codegen ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
-          flutter pub run build_runner clean
+          flutter pub add --dev build_runner
+          flutter pub add freezed_annotation
+          flutter pub add --dev freezed
           popd
 
       - name: Run flutter rust bridge
@@ -127,10 +129,10 @@ jobs:
         env:
           RUST_BACKTRACE: full
         run: |
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h --class-name=RustApi --skip-add-mod-to-lib
           pushd flutter
           flutter pub run build_runner build --delete-conflicting-outputs
           popd
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h --class-name=RustApi --skip-add-mod-to-lib
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
 
       - name: Upload Artifact
