@@ -44,8 +44,7 @@ jobs:
         run: |
           # Unlink existing pkg-config if it exists
           brew unlink pkg-config@0.29.2 || true
-          brew install llvm create-dmg nasm cmake gcc wget ninja
-          brew link --overwrite pkgconf
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkgconf
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
