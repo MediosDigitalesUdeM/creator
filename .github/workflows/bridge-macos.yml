@@ -1,6 +1,12 @@
 name: Bridge Generation macOS
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+        default: "master"
   workflow_dispatch:
 
 env:
@@ -13,7 +19,19 @@ jobs:
     name: Generate Bridge Code
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source code
+        if: ${{ inputs.version != 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: ${{ format('refs/tags/{0}', inputs.version) }}
+          submodules: recursive
+
+      - name: Checkout master
+        if: ${{ inputs.version == 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
       
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -33,6 +51,12 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-darwin
+          components: "rustfmt"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bridge-macos
 
       - name: Install flutter_rust_bridge_codegen
         run: dart pub global activate flutter_rust_bridge_codegen ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
