@@ -23,11 +23,6 @@ on:
         required: true
         default: ''
         type: string
-      slogan:
-        description: "Custom Slogan"
-        required: false
-        default: ''
-        type: string
       uuid:
         description: "uuid of request"
         required: true
