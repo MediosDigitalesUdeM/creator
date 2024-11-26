@@ -49,7 +49,7 @@ on:
         default: 'rustdesk'
         type: string
       extras:
-        description: "Extra JSON inputs"
+        description: "extra inputs in json"
         required: true
         default: '{}'
         type: string
@@ -69,13 +69,13 @@ env:
 
 jobs:
   generate-bridge:
-    uses: ./.github/workflows/bridge.yml
+    uses: ./.github/workflows/bridge-macos.yml
     with:
       version: ${{ fromJson(inputs.extras).version }}
 
   build-for-macOS:
     name: ${{ matrix.job.target }}
-    runs-on: self-hosted
+    runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
     strategy:
       fail-fast: false
@@ -102,6 +102,12 @@ jobs:
           repository: rustdesk/rustdesk
           ref: ${{ fromJson(inputs.extras).version != 'master' && format('refs/tags/{0}', fromJson(inputs.extras).version) || 'master' }}
           submodules: recursive
+
+      - name: Download bridge artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact-macos
+          path: .
 
       - name: Install Rust toolchain and dependencies
         run: |
