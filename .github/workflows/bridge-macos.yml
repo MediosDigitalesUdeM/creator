@@ -33,6 +33,16 @@ jobs:
         with:
           repository: rustdesk/rustdesk
       
+      - name: Install build runtime
+        run: |
+            brew install llvm create-dmg nasm cmake gcc wget ninja
+            # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
+            if command -v pkg-config &>/dev/null; then
+            echo "pkg-config is already installed"
+            else
+            brew install pkg-config
+            fi
+
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -40,12 +50,6 @@ jobs:
           channel: 'stable'
           cache: true
       
-      - name: Install prerequisites
-        run: |
-          # Unlink existing pkg-config if it exists
-          brew unlink pkg-config@0.29.2 || true
-          brew install llvm create-dmg nasm cmake gcc wget ninja pkgconf
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
