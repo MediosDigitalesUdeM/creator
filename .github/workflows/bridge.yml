@@ -31,7 +31,7 @@ jobs:
           - {
               target: aarch64-apple-darwin,
               os: macos-latest,
-              extra-build-args: "--screencapturekit",
+              extra-build-args: "",
             }
     steps:
       - name: Checkout source code
@@ -70,7 +70,10 @@ jobs:
       - name: Install prerequisites (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake ninja pkg-config
+          # Unlink existing pkg-config if it exists
+          brew unlink pkg-config@0.29.2 || true
+          brew install cmake ninja pkgconf
+          brew link --overwrite pkgconf
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
