@@ -44,7 +44,7 @@ jobs:
         run: |
           # Unlink existing pkg-config if it exists
           brew unlink pkg-config@0.29.2 || true
-          brew install cmake ninja pkgconf
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
           brew link --overwrite pkgconf
 
       - name: Install Rust toolchain
@@ -60,6 +60,8 @@ jobs:
 
       - name: Install flutter_rust_bridge_codegen
         run: cargo install --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} flutter_rust_bridge_codegen
+             pushd flutter && flutter pub get && popd
+             ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
 
       - name: Install dependencies
         run: flutter pub get
