@@ -1,0 +1,55 @@
+name: Bridge Generation macOS
+
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.19.6"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  RUST_VERSION: "1.75"
+
+jobs:
+  generate-bridge:
+    name: Generate Bridge Code
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+      
+      - name: Install prerequisites
+        run: |
+          # Unlink existing pkg-config if it exists
+          brew unlink pkg-config@0.29.2 || true
+          brew install cmake ninja pkgconf
+          brew link --overwrite pkgconf
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Install flutter_rust_bridge_codegen
+        run: dart pub global activate flutter_rust_bridge_codegen ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: flutter
+
+      - name: Generate bridge
+        run: flutter_rust_bridge_codegen generate
+
+      - name: Upload bridge artifacts
+        uses: actions/upload-artifact@master
+        with:
+          name: bridge-artifact-macos
+          path: |
+            ./src/bridge_generated.rs
+            ./src/bridge_generated.io.rs
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
