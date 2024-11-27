@@ -78,10 +78,19 @@ jobs:
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android-kotlin.tmpl
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/skeleton
 
+      - name: Setup vcpkg with github actions binary cache
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          vcpkgJsonGlob: '**/vcpkg.json'
+          appendedCacheKey: vcpkginstall-${{ matrix.job.target }}
 
       - name: Install vcpkg dependencies
         run: |
