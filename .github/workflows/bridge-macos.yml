@@ -4,29 +4,18 @@ on:
     inputs:
       version:
         description: 'Rustdesk Version'
-        required: false
+        required: true
         type: string
-        default: "master"
 
 env:
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   RUST_VERSION: "1.75"
-  RUST_BACKTRACE: "full"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
 
 jobs:
   generate_bridge:
     runs-on: macos-latest
     steps:
-      - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
@@ -36,37 +25,12 @@ jobs:
 
       - name: Install build runtime (macOS)
         run: |
-            brew install llvm create-dmg nasm cmake gcc wget ninja
-            # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
-            if command -v pkg-config &>/dev/null; then
-                echo "pkg-config is already installed"
-            else
-                brew install pkg-config
-            fi
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      - name: Patch flutter
-        continue-on-error: true
-        run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
-
-      - name: Workaround for flutter issue
-        run: |
-          cd $(dirname $(dirname $(which flutter)))
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/app/android.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/module/android.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android-kotlin.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/skeleton
+          brew install llvm create-dmg nasm cmake gcc wget ninja
+          if command -v pkg-config &>/dev/null; then
+              echo "pkg-config is already installed"
+          else
+              brew install pkg-config
+          fi
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -77,78 +41,33 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: macos-latest
-          cache-targets: true
-          cache-all-crates: false
-          save-if: true
-          cache-provider: github
+          prefix-key: bridge-macos
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@v4
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
         with:
-          name: bridge-artifact
-          path: ./
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
 
-      - name: Setup vcpkg with github actions binary cache
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} flutter_rust_bridge_codegen
 
-      - name: Create vcpkg directories
+      - name: Install flutter rust bridge deps
+        shell: bash
         run: |
-          mkdir -p ${{ github.workspace }}/vcpkg
-          mkdir -p ${{ github.workspace }}/vcpkg_cache
+          pushd flutter && flutter pub get && popd
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-
-      - name: Install vcpkg dependencies
+      - name: Run flutter rust bridge
         run: |
-          if ! $VCPKG_ROOT/vcpkg \
-            install \
-            --x-install-root="$VCPKG_ROOT/installed"; then
-            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
-              echo "$_1:"
-              echo "======"
-              cat "$_1"
-              echo "======"
-              echo ""
-            done
-            exit 1
-          fi
-        env:
-          VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
-          RUNVCPKG_VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-
-      - name: Generate bridge files
-        run: |
-          mkdir -p flutter/lib/generated
-          mkdir -p flutter/macos/Runner
-          mkdir -p flutter/ios/Runner
-
-          flutter_rust_bridge_codegen \
-            --rust-input src/flutter_ffi.rs \
-            --dart-output flutter/lib/generated/bridge_generated.dart \
-            --c-output flutter/macos/Runner/bridge_generated.h \
-            --dart-decl-output flutter/lib/generated/bridge_definitions.dart \
-            --class-name RustDesk
-
-          cp flutter/macos/Runner/bridge_generated.h flutter/ios/Runner/
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-artifact-macos
+          name: bridge-artifact
           path: |
             ./src/bridge_generated.rs
             ./src/bridge_generated.io.rs
-            ./flutter/lib/generated/bridge_generated.dart
-            ./flutter/lib/generated/bridge_definitions.dart
-            ./flutter/macos/Runner/bridge_generated.h
-            ./flutter/ios/Runner/bridge_generated.h
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
