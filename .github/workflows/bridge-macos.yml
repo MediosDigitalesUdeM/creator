@@ -62,10 +62,11 @@ jobs:
           cd lib
           find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}
           cd ..
-          flutter pub add ffigen --dev
+          flutter pub add ffigen:^8.0.0 --dev
           flutter pub add build_runner --dev
           flutter pub add freezed_annotation
           flutter pub add freezed --dev
+          flutter pub get
           cd ..
 
       - name: Run flutter rust bridge
