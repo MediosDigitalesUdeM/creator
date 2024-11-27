@@ -85,6 +85,11 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
+      - name: Create vcpkg directories
+        run: |
+          mkdir -p ${{ github.workspace }}/vcpkg
+          mkdir -p ${{ github.workspace }}/vcpkg_cache
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
