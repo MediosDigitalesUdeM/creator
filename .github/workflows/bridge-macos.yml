@@ -47,13 +47,6 @@ jobs:
             llvm \
             create-dmg
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          targets: aarch64-apple-darwin
-          components: "rustfmt"
-
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -77,6 +70,13 @@ jobs:
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android.tmpl
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android-kotlin.tmpl
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/skeleton
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-darwin
+          components: "rustfmt"
 
       - name: Setup vcpkg with github actions binary cache
         uses: actions/github-script@v6
