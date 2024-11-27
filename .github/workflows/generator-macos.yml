@@ -175,13 +175,13 @@ jobs:
           flutter config --enable-macos-desktop
           cd ..
 
-        - name: Build rustdesk
+      - name: Build rustdesk
         run: |
           ./build.py --flutter --hwcodec
 
-        - name: Create DMG
-          run: |
-            cd flutter/build/macos/Build/Products/Release
+      - name: Create DMG
+        run: |
+          cd flutter/build/macos/Build/Products/Release
             chmod -R +x RustDesk.app
             if [ "${{ inputs.appname }}" != "" ]; then
               mv "RustDesk.app" "${{ inputs.appname }}.app"
