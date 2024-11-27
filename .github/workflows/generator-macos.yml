@@ -95,6 +95,13 @@ jobs:
               core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
               core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: ${{ env.VERSION != 'master' && format('refs/tags/{0}', env.VERSION) || 'master' }}
+          submodules: recursive
+
       - name: Install build runtime
         run: |
           brew install \
@@ -107,14 +114,31 @@ jobs:
             ninja \
             create-dmg \
             llvm
-
-      - name: Checkout source code
-        uses: actions/checkout@v4
+      
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
         with:
-          repository: rustdesk/rustdesk
-          ref: ${{ env.VERSION != 'master' && format('refs/tags/{0}', env.VERSION) || 'master' }}
-          submodules: recursive
+              channel: "stable"
+              flutter-version: ${{ env.FLUTTER_VERSION }}
+              architecture: ARM64
+              cache: false
+              pub-cache-path: default
+              dry-run: false    
 
+      - name: Patch flutter
+        continue-on-error: true
+        run: |
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cd $(dirname $(dirname $(which flutter)))
+          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+
+      - name: Workaround for flutter issue
+        run: |
+          cd "$(dirname "$(which flutter)")"
+          # https://github.com/flutter/flutter/issues/133533
+          sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
+          grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
+      
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -122,12 +146,11 @@ jobs:
           targets: aarch64-apple-darwin
           components: "rustfmt"
 
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
         with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+            name: bridge-artifact-macos
+            path: ./
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
@@ -149,29 +172,8 @@ jobs:
             exit 1
           fi
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
-        with:
-          name: bridge-artifact-macos
-          path: ./
-
-      - name: Patch flutter
-        continue-on-error: true
-        run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
-
-      - name: Workaround for flutter issue
-        run: |
-          cd $(dirname $(dirname $(which flutter)))
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/app/android.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/module/android.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android-kotlin.tmpl
-          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/skeleton
-
+            
+      
       - name: Setup Flutter project
         run: |
           cd flutter
@@ -182,7 +184,14 @@ jobs:
 
       - name: Build rustdesk
         run: |
-          ./build.py --flutter --hwcodec
+            if [ "aarch64-apple-darwin" = "aarch64-apple-darwin" ]; then
+              MIN_MACOS_VERSION="12.3"
+              sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+              sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+              sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+              sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+            fi
+            ./build.py --flutter --hwcodec --screencapturekit
 
       - name: Create DMG
         run: |
