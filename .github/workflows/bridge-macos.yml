@@ -61,13 +61,7 @@ jobs:
       - name: Setup Flutter project
         run: |
           cd flutter
-          # Fix extended_text version
           sed -i 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
-          # Add necessary dependencies
-          flutter pub add --dev build_runner
-          flutter pub add freezed_annotation
-          flutter pub add --dev freezed
-          flutter pub add flutter_rust_bridge
           flutter pub get
           cd ..
 
@@ -82,35 +76,16 @@ jobs:
           mkdir -p flutter/macos/Runner
           mkdir -p flutter/ios/Runner
 
-          # Set environment variables
-          export FLUTTER_ROOT=$(dirname $(which flutter))
-          export PATH="$FLUTTER_ROOT/bin:$PATH"
-          export PATH="$PATH:$HOME/.pub-cache/bin"
-
-          # Generate bridge files
-          cd flutter
-          flutter clean
-          flutter pub get
-
           # Generate bridge code
           flutter_rust_bridge_codegen \
-            --rust-input ../src/flutter_ffi.rs \
-            --dart-output lib/generated/bridge_generated.dart \
-            --c-output macos/Runner/bridge_generated.h \
-            --dart-decl-output lib/generated/bridge_definitions.dart \
+            --rust-input src/flutter_ffi.rs \
+            --dart-output flutter/lib/generated/bridge_generated.dart \
+            --c-output flutter/macos/Runner/bridge_generated.h \
+            --dart-decl-output flutter/lib/generated/bridge_definitions.dart \
             --class-name RustDesk
 
-          # Setup build_runner
-          dart pub global activate build_runner
-          dart pub global activate freezed
-          
-          # Run build_runner with explicit Dart SDK
-          DART_SDK=$(dirname $(which dart))
-          $DART_SDK/dart run build_runner build --delete-conflicting-outputs
-
           # Copy header file
-          cp macos/Runner/bridge_generated.h ios/Runner/
-          cd ..
+          cp flutter/macos/Runner/bridge_generated.h flutter/ios/Runner/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@master
