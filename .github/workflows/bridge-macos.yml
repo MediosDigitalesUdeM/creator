@@ -97,12 +97,14 @@ jobs:
           export PATH="$DART_SDK/bin:$PATH"
           export PATH="$PATH:$HOME/.pub-cache/bin"
           
-          # Verify environment
-          echo "Flutter root: $FLUTTER_ROOT"
-          echo "Dart SDK: $DART_SDK"
-          echo "PATH: $PATH"
-          flutter --version
-          dart --version
+          # Setup Flutter project
+          flutter clean
+          flutter pub get
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
+          flutter pub add flutter_rust_bridge
+          flutter pub get
           
           # Generate bridge code
           flutter_rust_bridge_codegen \
@@ -110,15 +112,12 @@ jobs:
             --dart-output lib/generated/bridge_generated.dart \
             --c-output macos/Runner/bridge_generated.h \
             --dart-decl-output lib/generated/bridge_definitions.dart \
-            --class-name RustDesk
+            --class-name RustDesk \
+            --llvm-path /opt/homebrew/opt/llvm \
+            --skip-add-mod-to-lib \
+            --no-build-runner
           
-          # Setup build environment
-          flutter pub get
-          flutter pub global activate build_runner
-          
-          # Run build_runner using full path to dart
-          "$DART_SDK/bin/dart" pub global run build_runner build --delete-conflicting-outputs
-          
+          # Copy header file
           cp macos/Runner/bridge_generated.h ios/Runner/
           cd ..
 
