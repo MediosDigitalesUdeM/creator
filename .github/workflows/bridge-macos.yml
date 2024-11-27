@@ -132,7 +132,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-artifact
+          name: bridge-artifact-macos
           path: |
             ./src/bridge_generated.rs
             ./src/bridge_generated.io.rs
