@@ -56,12 +56,33 @@ jobs:
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
-          pushd flutter/lib; find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}; popd;
-          # pushd flutter && flutter pub get && popd
+          cd flutter
+          flutter clean
+          flutter pub get
+          cd lib
+          find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}
+          cd ..
+          flutter pub add ffigen --dev
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
+          cd ..
 
       - name: Run flutter rust bridge
         run: |
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+          mkdir -p flutter/lib/generated
+          mkdir -p flutter/macos/Runner
+          mkdir -p flutter/ios/Runner
+          
+          ~/.cargo/bin/flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          
+          cd flutter
+          dart run build_runner build --delete-conflicting-outputs
+          cd ..
+          
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
 
       - name: Upload Artifact
