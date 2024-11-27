@@ -182,58 +182,58 @@ jobs:
       - name: Create DMG
         run: |
           cd flutter/build/macos/Build/Products/Release
-            chmod -R +x RustDesk.app
-            if [ "${{ inputs.appname }}" != "" ]; then
-              mv "RustDesk.app" "${{ inputs.appname }}.app"
-              APP_NAME="${{ inputs.appname }}"
-            else
-              APP_NAME="RustDesk"
-            fi
-            
-            create-dmg \
-              --volname "$APP_NAME" \
-              --window-size 800 400 \
-              --icon-size 100 \
-              --icon "$APP_NAME.app" 200 190 \
-              --hide-extension "$APP_NAME.app" \
-              --app-drop-link 600 185 \
-              --no-internet-enable \
-              "${{ inputs.filename }}.dmg" \
-              "./$APP_NAME.app"
-            
-            mkdir -p ../../../../../../SignOutput/
-            mv "${{ inputs.filename }}.dmg" ../../../../../../SignOutput/
+          chmod -R +x RustDesk.app
+          if [ "${{ inputs.appname }}" != "" ]; then
+            mv "RustDesk.app" "${{ inputs.appname }}.app"
+            APP_NAME="${{ inputs.appname }}"
+          else
+            APP_NAME="RustDesk"
+          fi
+          
+          create-dmg \
+            --volname "$APP_NAME" \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "$APP_NAME.app" 200 190 \
+            --hide-extension "$APP_NAME.app" \
+            --app-drop-link 600 185 \
+            --no-internet-enable \
+            "${{ inputs.filename }}.dmg" \
+            "./$APP_NAME.app"
+          
+          mkdir -p ../../../../../../SignOutput/
+          mv "${{ inputs.filename }}.dmg" ../../../../../../SignOutput/
 
-        - name: Sign DMG
-          if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
-          run: |
-            echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
-            security create-keychain -p mysecretpassword build.keychain
-            security default-keychain -s build.keychain
-            security unlock-keychain -p mysecretpassword build.keychain
-            security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
-            codesign --force --options runtime -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg" -vvv
+      - name: Sign DMG
+        if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
+          security create-keychain -p mysecretpassword build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p mysecretpassword build.keychain
+          security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
+          codesign --force --options runtime -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg" -vvv
 
-        - name: Upload to FTP
-          if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
-          uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-          with:
-            server: ${{ secrets.GEN_FTP_SERVER }}
-            username: ${{ secrets.GEN_FTP_USER }}
-            password: ${{ secrets.GEN_FTP_PASSWORD }}
-            local-dir: ./SignOutput/
-            server-dir: exe/${{ env.UUIDFOLDER }}/
+      - name: Upload to FTP
+        if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.GEN_FTP_SERVER }}
+          username: ${{ secrets.GEN_FTP_USER }}
+          password: ${{ secrets.GEN_FTP_PASSWORD }}
+          local-dir: ./SignOutput/
+          server-dir: exe/${{ env.UUIDFOLDER }}/
 
-        - name: Update build status
-          if: always()
-          continue-on-error: true
-          run: |
-            if [ ${{ job.status }} == "success" ]; then
-              STATUS="Success"
-            else
-              STATUS="Build failed"
-            fi
-            curl -X POST ${{ env.STATUS_URL }} \
-            -H "Content-Type: application/json" \
-            -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"$STATUS\"}"
+      - name: Update build status
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ ${{ job.status }} == "success" ]; then
+            STATUS="Success"
+          else
+            STATUS="Build failed"
+          fi
+          curl -X POST ${{ env.STATUS_URL }} \
+          -H "Content-Type: application/json" \
+          -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"$STATUS\"}"
