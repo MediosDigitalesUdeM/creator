@@ -58,7 +58,7 @@ env:
   SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
   RUST_VERSION: "1.81"
   CARGO_NDK_VERSION: "3.1.2"
-  LLVM_VERSION: "18.1.8"
+  LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.22.2"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   FLUTTER_ELINUX_VERSION: "3.16.9"
@@ -170,7 +170,7 @@ jobs:
         run: |
           brew install llvm@15
           echo "LLVM_PATH=/opt/homebrew/opt/llvm@15" >> $GITHUB_ENV
-  
+
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
@@ -182,12 +182,20 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-              channel: "stable"
-              flutter-version: ${{ env.FLUTTER_VERSION }}
-              architecture: ARM64
-              cache: false
-              pub-cache-path: default
-              dry-run: false    
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: ARM64
+          cache: false
+          pub-cache-path: default
+          dry-run: false    
+
+      - name: Setup Flutter project
+        run: |
+          cd flutter
+          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
+          flutter pub get
+          flutter config --enable-macos-desktop
+          cd ..
 
       - name: Patch flutter
         continue-on-error: true
@@ -259,7 +267,7 @@ jobs:
         if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
         shell: bash
         run: |
-            sed -i -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
+        sed -i -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
           
       
       #- name: Setup Flutter project
