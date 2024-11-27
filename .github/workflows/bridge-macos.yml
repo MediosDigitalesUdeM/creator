@@ -51,7 +51,7 @@ jobs:
           cache: true
 
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} flutter_rust_bridge_codegen --features "uuid"
+        run: cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
 
       - name: Install flutter rust bridge deps
         shell: bash
