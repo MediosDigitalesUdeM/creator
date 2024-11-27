@@ -43,36 +43,41 @@ jobs:
         with:
           prefix-key: bridge-macos
 
-      - name: Install flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
+          channel: 'stable'
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
+      - name: Verify Flutter installation
+        run: |
+          flutter doctor -v
+          which flutter
+          which dart
+          echo $PATH
+
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+        run: |
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
 
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
           cd flutter
           flutter clean
-          # Fix extended_text version first
           sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
           flutter pub get
           cd lib
           find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}
           cd ..
-          # Add dependencies in correct order
           flutter pub add build_runner --dev
           flutter pub add freezed_annotation
           flutter pub add freezed --dev
           flutter pub add ffigen:^8.0.0 --dev
           flutter pub add flutter_rust_bridge
-          # Run pub get again to resolve dependencies
           flutter pub get
-          # Create generated directory
           mkdir -p lib/generated
           cd ..
 
@@ -96,9 +101,8 @@ jobs:
             --dart-decl-output lib/generated/bridge_definitions.dart \
             --class-name RustDesk
           
-          # Run build_runner in the Flutter directory
-          dart pub global activate build_runner
-          dart run build_runner build --delete-conflicting-outputs
+          flutter pub global activate build_runner
+          flutter pub run build_runner build --delete-conflicting-outputs
           
           cp macos/Runner/bridge_generated.h ios/Runner/
           cd ..
