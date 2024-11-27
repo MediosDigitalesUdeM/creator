@@ -286,6 +286,9 @@ jobs:
               sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
               sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
               sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+              # Add output dependencies for Flutter build
+              mkdir -p flutter/macos/Flutter/ephemeral
+              touch flutter/macos/Flutter/ephemeral/Flutter-Generated.xcconfig
             fi
             ./build.py --flutter --hwcodec --screencapturekit
 
