@@ -167,9 +167,9 @@ jobs:
           sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          brew install llvm@15
+          echo "LLVM_PATH=/opt/homebrew/opt/llvm@15" >> $GITHUB_ENV
   
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
