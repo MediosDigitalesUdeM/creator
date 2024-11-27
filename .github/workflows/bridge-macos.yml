@@ -78,6 +78,16 @@ jobs:
           targets: aarch64-apple-darwin
           components: "rustfmt"
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bridge-macos
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
+        with:
+          name: bridge-artifact-macos
+          path: ./
+
       - name: Setup vcpkg with github actions binary cache
         uses: actions/github-script@v6
         with:
