@@ -28,17 +28,11 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Checkout source code
-        if: ${{ inputs.version != 'master' }}
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
-          ref: refs/tags/${{ inputs.version }}
-            
-      - name: Checkout source code
-        if: ${{ inputs.version == 'master' }}
-        uses: actions/checkout@v4
-        with:
-          repository: rustdesk/rustdesk
+          ref: ${{ inputs.version != 'master' && format('refs/tags/{0}', inputs.version) || 'master' }}
+          submodules: recursive
 
       - name: Install build runtime (macOS)
         run: |
