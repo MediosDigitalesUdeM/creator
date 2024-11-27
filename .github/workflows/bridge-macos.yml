@@ -61,18 +61,6 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-
-      - name: Install vcpkg dependencies
-        run: |
-          vcpkg install libvpx:arm64-osx
-          vcpkg install opus:arm64-osx
-          vcpkg install aom:arm64-osx
-          vcpkg install openh264:arm64-osx
-
       - name: Patch flutter
         continue-on-error: true
         run: |
@@ -89,6 +77,18 @@ jobs:
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android.tmpl
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android-kotlin.tmpl
           git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/skeleton
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Install vcpkg dependencies
+        run: |
+          vcpkg install libvpx:arm64-osx
+          vcpkg install opus:arm64-osx
+          vcpkg install aom:arm64-osx
+          vcpkg install openh264:arm64-osx
 
       - name: Generate bridge files
         run: |
