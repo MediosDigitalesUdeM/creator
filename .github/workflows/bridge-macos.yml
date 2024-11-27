@@ -13,11 +13,20 @@ env:
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   RUST_VERSION: "1.75"
   RUST_BACKTRACE: "full"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
 
 jobs:
   generate_bridge:
     runs-on: macos-latest
     steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
@@ -25,7 +34,7 @@ jobs:
           ref: ${{ inputs.version != 'master' && format('refs/tags/{0}', inputs.version) || 'master' }}
           submodules: recursive
 
-      - name: Install prerequisites
+      - name: Install build runtime
         run: |
           brew install \
             cmake \
@@ -35,7 +44,8 @@ jobs:
             nasm \
             yasm \
             ninja \
-            llvm
+            llvm \
+            create-dmg
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -51,25 +61,41 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Setup Flutter project
-        run: |
-          cd flutter
-          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
-          flutter pub get
-          cd ..
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
 
-      - name: Install flutter_rust_bridge_codegen
+      - name: Install vcpkg dependencies
         run: |
-          cargo install --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} flutter_rust_bridge_codegen --features "uuid"
+          vcpkg install libvpx:arm64-osx
+          vcpkg install opus:arm64-osx
+          vcpkg install aom:arm64-osx
+          vcpkg install openh264:arm64-osx
+
+      - name: Patch flutter
+        continue-on-error: true
+        run: |
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cd $(dirname $(dirname $(which flutter)))
+          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+
+      - name: Workaround for flutter issue
+        run: |
+          cd $(dirname $(dirname $(which flutter)))
+          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64
+          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/app/android.tmpl
+          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/module/android.tmpl
+          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android.tmpl
+          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/plugin/android-kotlin.tmpl
+          git config --global --add safe.directory /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/packages/flutter_tools/templates/skeleton
 
       - name: Generate bridge files
         run: |
-          # Create directories
           mkdir -p flutter/lib/generated
           mkdir -p flutter/macos/Runner
           mkdir -p flutter/ios/Runner
 
-          # Generate bridge code
           flutter_rust_bridge_codegen \
             --rust-input src/flutter_ffi.rs \
             --dart-output flutter/lib/generated/bridge_generated.dart \
@@ -77,7 +103,6 @@ jobs:
             --dart-decl-output flutter/lib/generated/bridge_definitions.dart \
             --class-name RustDesk
 
-          # Copy header file
           cp flutter/macos/Runner/bridge_generated.h flutter/ios/Runner/
 
       - name: Upload Artifact
