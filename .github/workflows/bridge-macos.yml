@@ -80,7 +80,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: bridge-macos
+          prefix-key: macos-latest
+          cache-targets: true
+          cache-all-crates: false
+          save-if: true
+          cache-provider: github
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
