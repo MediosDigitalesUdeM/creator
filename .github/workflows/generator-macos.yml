@@ -269,7 +269,20 @@ jobs:
         run: |
             sed -i -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
           
-      
+      - name: Configure Flutter build
+        run: |
+          cd flutter/macos
+          # Create Flutter build configuration
+          mkdir -p Flutter/ephemeral
+          cat > Flutter/ephemeral/FlutterOutputs.xcfilelist << EOF
+          $(pwd)/Flutter/ephemeral/App.framework
+          $(pwd)/Flutter/ephemeral/FlutterMacOS.framework
+          $(pwd)/Flutter/ephemeral/flutter_assets
+          EOF
+          # Update Runner project
+          /usr/libexec/PlistBuddy -c "Add :RunnerTargetForConfigCommand string Flutter/ephemeral/FlutterOutputs.xcfilelist" Runner.xcodeproj/project.pbxproj
+          cd ../..
+
       #- name: Setup Flutter project
       #  run: |
       #    cd flutter
@@ -290,7 +303,7 @@ jobs:
               mkdir -p flutter/macos/Flutter/ephemeral
               touch flutter/macos/Flutter/ephemeral/Flutter-Generated.xcconfig
             fi
-            ./build.py --flutter --hwcodec --screencapturekit
+            ./build.py --flutter
 
       - name: Create DMG
         run: |
