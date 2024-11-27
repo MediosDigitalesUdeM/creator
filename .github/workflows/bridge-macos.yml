@@ -12,6 +12,7 @@ env:
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   RUST_VERSION: "1.75"
+  RUST_BACKTRACE: "full"
 
 jobs:
   generate_bridge:
@@ -63,6 +64,9 @@ jobs:
           # Fix extended_text version
           sed -i 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
           flutter pub get
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
           cd ..
 
       - name: Install flutter_rust_bridge_codegen
@@ -71,10 +75,18 @@ jobs:
 
       - name: Generate bridge files
         run: |
+          mkdir -p flutter/lib/generated
           ~/.cargo/bin/flutter_rust_bridge_codegen \
             --rust-input ./src/flutter_ffi.rs \
-            --dart-output ./flutter/lib/generated_bridge.dart \
-            --c-output ./flutter/macos/Runner/bridge_generated.h
+            --dart-output ./flutter/lib/generated/bridge_generated.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h \
+            --dart-decl-output ./flutter/lib/generated/bridge_definitions.dart \
+            --class-name RustDesk
+
+          cd flutter
+          dart run build_runner build --delete-conflicting-outputs
+          cd ..
+
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
 
       - name: Upload Artifact
@@ -84,7 +96,7 @@ jobs:
           path: |
             ./src/bridge_generated.rs
             ./src/bridge_generated.io.rs
-            ./flutter/lib/generated_bridge.dart
-            ./flutter/lib/generated_bridge.freezed.dart
+            ./flutter/lib/generated/bridge_generated.dart
+            ./flutter/lib/generated/bridge_definitions.dart
             ./flutter/macos/Runner/bridge_generated.h
             ./flutter/ios/Runner/bridge_generated.h
