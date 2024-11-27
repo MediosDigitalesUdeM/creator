@@ -84,16 +84,27 @@ jobs:
       - name: Run flutter rust bridge
         env:
           RUST_BACKTRACE: "full"
+          FLUTTER_ROOT: "/Users/venimk/actions-runner/_work/_tool/flutter/stable-3.24.5-arm64"
+          DART_SDK: "/Users/venimk/actions-runner/_work/_tool/flutter/stable-3.24.5-arm64/bin/cache/dart-sdk"
         run: |
           mkdir -p flutter/lib/generated
           mkdir -p flutter/macos/Runner
           mkdir -p flutter/ios/Runner
           
           cd flutter
-          export FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
+          # Set up environment
           export PATH="$FLUTTER_ROOT/bin:$PATH"
+          export PATH="$DART_SDK/bin:$PATH"
           export PATH="$PATH:$HOME/.pub-cache/bin"
           
+          # Verify environment
+          echo "Flutter root: $FLUTTER_ROOT"
+          echo "Dart SDK: $DART_SDK"
+          echo "PATH: $PATH"
+          flutter --version
+          dart --version
+          
+          # Generate bridge code
           flutter_rust_bridge_codegen \
             --rust-input ../src/flutter_ffi.rs \
             --dart-output lib/generated/bridge_generated.dart \
@@ -101,8 +112,12 @@ jobs:
             --dart-decl-output lib/generated/bridge_definitions.dart \
             --class-name RustDesk
           
+          # Setup build environment
+          flutter pub get
           flutter pub global activate build_runner
-          flutter pub run build_runner build --delete-conflicting-outputs
+          
+          # Run build_runner using full path to dart
+          "$DART_SDK/bin/dart" pub global run build_runner build --delete-conflicting-outputs
           
           cp macos/Runner/bridge_generated.h ios/Runner/
           cd ..
