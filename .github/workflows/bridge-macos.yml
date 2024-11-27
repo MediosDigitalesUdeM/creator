@@ -76,7 +76,17 @@ jobs:
           # First update the pubspec.yaml
           cd flutter
           sed -i '' 's/3.1.0/2.17.0/g' pubspec.yaml
+          
+          # Clean and get dependencies
+          flutter clean
           flutter pub get
+          
+          # Explicitly run dart pub get to ensure proper setup
+          dart pub get
+          
+          # Install build_runner globally
+          dart pub global activate build_runner
+          
           cd ..
           
           # Install flutter_rust_bridge_codegen
@@ -93,6 +103,9 @@ jobs:
             --c-output ./macos/Runner/bridge_generated.h \
             --dart-decl-output ./lib/bridge_definitions.dart
 
+          # Run build_runner directly with dart
+          dart run build_runner build --delete-conflicting-outputs
+          
           # Verify the generated files
           ls -la lib/generated_bridge.dart lib/bridge_definitions.dart macos/Runner/bridge_generated.h || true
 
