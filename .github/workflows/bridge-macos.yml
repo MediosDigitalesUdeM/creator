@@ -32,12 +32,21 @@ jobs:
               brew install pkg-config
           fi
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: aarch64-apple-darwin
-          components: "rustfmt"
+          target: aarch64-apple-darwin
+          profile: minimal
+          default: true
+          components: rustfmt
+
+      - name: Install Rust toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source $HOME/.cargo/env
+          rustup default ${{ env.RUST_VERSION }}
+          rustup target add aarch64-apple-darwin
 
       - uses: Swatinem/rust-cache@v2
         with:
