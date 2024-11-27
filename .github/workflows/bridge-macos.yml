@@ -89,8 +89,11 @@ jobs:
       - name: Restore bridge files
         uses: actions/download-artifact@master
         with:
-          name: bridge-artifact-macos
+          name: bridge-artifact
           path: ./
+          merge-multiple: false
+          repository: rustdesk/rustdesk
+          run-id: 12041237685
 
       - name: Setup vcpkg with github actions binary cache
         uses: actions/github-script@v6
