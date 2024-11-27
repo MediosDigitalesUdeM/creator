@@ -89,15 +89,25 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-          vcpkgJsonGlob: '**/vcpkg.json'
-          appendedCacheKey: vcpkginstall-${{ matrix.job.target }}
 
       - name: Install vcpkg dependencies
         run: |
-          vcpkg install libvpx:arm64-osx
-          vcpkg install opus:arm64-osx
-          vcpkg install aom:arm64-osx
-          vcpkg install openh264:arm64-osx
+          if ! $VCPKG_ROOT/vcpkg \
+            install \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              echo "======"
+              cat "$_1"
+              echo "======"
+              echo ""
+            done
+            exit 1
+          fi
+        env:
+          VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
+          RUNVCPKG_VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
       - name: Generate bridge files
         run: |
