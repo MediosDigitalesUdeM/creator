@@ -84,13 +84,11 @@ jobs:
           cache-provider: github
 
       - name: Restore bridge files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v4
         with:
           name: bridge-artifact
           path: ./
-          merge-multiple: false
-          repository: rustdesk/rustdesk
-          run-id: 12041237685
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup vcpkg with github actions binary cache
         uses: actions/github-script@v6
@@ -144,7 +142,7 @@ jobs:
           cp flutter/macos/Runner/bridge_generated.h flutter/ios/Runner/
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v4
         with:
           name: bridge-artifact-macos
           path: |
