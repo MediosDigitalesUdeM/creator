@@ -61,19 +61,18 @@ jobs:
         with:
           prefix-key: bridge-macos
 
-      - name: Install flutter_rust_bridge_codegen
-        run: cargo install --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} flutter_rust_bridge_codegen
-
-      - name: Install dependencies
-        working-directory: flutter
+      - name: Install flutter rust bridge deps
+        shell: bash
         run: |
-          flutter pub get
+          sed -i '' 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
+          cargo install flutter_rust_bridge_codegen --version ${{ matrix.job.bridge }} --features "uuid"
+          # below works for mac to make buildable on 3.13.9
+          # pushd flutter/lib; find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}; popd;
+          pushd flutter && flutter pub get && popd
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+  
 
-      - name: Generate bridge
-        run: |
-           flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
-           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
-
+      
       - name: Upload bridge artifacts
         uses: actions/upload-artifact@master
         with:
