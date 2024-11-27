@@ -1,5 +1,5 @@
   name: Build RustDesk macOS Custom Client
-
+  run-name: Custom Windows Client Generator
   on:
     workflow_dispatch:
       inputs:
