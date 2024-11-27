@@ -130,7 +130,30 @@ jobs:
         uses: actions/download-artifact@master
         with:
           name: bridge-artifact-macos
-          path: ./
+          path: 
+            ./flutter/lib/generated/
+            ./flutter/macos/Runner/
+            ./flutter/ios/Runner/
+
+      - name: Generate bridge files
+        run: |
+          cd flutter
+          # Create directories
+          mkdir -p lib/generated
+          mkdir -p macos/Runner
+          mkdir -p ios/Runner
+          
+          # Generate bridge code
+          flutter_rust_bridge_codegen \
+            --rust-input ../src/flutter_ffi.rs \
+            --dart-output lib/generated/bridge_generated.dart \
+            --c-output macos/Runner/bridge_generated.h \
+            --dart-decl-output lib/generated/bridge_definitions.dart \
+            --class-name RustDesk
+          
+          # Copy header file
+          cp macos/Runner/bridge_generated.h ios/Runner/
+          cd ..
 
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: true
