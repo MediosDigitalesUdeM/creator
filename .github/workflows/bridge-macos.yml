@@ -67,6 +67,7 @@ jobs:
           flutter pub add build_runner --dev
           flutter pub add freezed_annotation
           flutter pub add freezed --dev
+          flutter pub add flutter_rust_bridge
           cd ..
 
       - name: Install flutter_rust_bridge_codegen
@@ -75,19 +76,29 @@ jobs:
 
       - name: Generate bridge files
         run: |
+          # Create directories
           mkdir -p flutter/lib/generated
-          ~/.cargo/bin/flutter_rust_bridge_codegen \
-            --rust-input ./src/flutter_ffi.rs \
-            --dart-output ./flutter/lib/generated/bridge_generated.dart \
-            --c-output ./flutter/macos/Runner/bridge_generated.h \
-            --dart-decl-output ./flutter/lib/generated/bridge_definitions.dart \
+          mkdir -p flutter/macos/Runner
+          mkdir -p flutter/ios/Runner
+
+          # Generate bridge files
+          cd flutter
+          flutter pub get
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          flutter_rust_bridge_codegen \
+            --rust-input ../src/flutter_ffi.rs \
+            --dart-output lib/generated/bridge_generated.dart \
+            --c-output macos/Runner/bridge_generated.h \
+            --dart-decl-output lib/generated/bridge_definitions.dart \
             --class-name RustDesk
 
-          cd flutter
+          # Run build_runner
+          dart pub global activate build_runner
           dart run build_runner build --delete-conflicting-outputs
-          cd ..
 
-          cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
+          # Copy header file
+          cp macos/Runner/bridge_generated.h ios/Runner/
+          cd ..
 
       - name: Upload Artifact
         uses: actions/upload-artifact@master
