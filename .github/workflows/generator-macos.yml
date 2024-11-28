@@ -93,7 +93,6 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          - { target: x86_64-apple-darwin, os: macos-13, extra-build-args: "", arch: x86_64 }
           - { target: aarch64-apple-darwin, os: macos-latest, extra-build-args: "--screencapturekit", arch: aarch64 }
     steps:
 
