@@ -87,6 +87,7 @@ jobs:
       fail-fast: false
       matrix:
         job:
+          - { target: x86_64-apple-darwin, os: macos-13, extra-build-args: "", arch: x86_64 }
           - { target: aarch64-apple-darwin, os: macos-latest, extra-build-args: "--screencapturekit", arch: aarch64 }
     steps:
       # 1. Initial Setup
@@ -166,7 +167,7 @@ jobs:
         with:
           prefix-key: ${{ matrix.job.os }}
 
-      # Setup Flutter and tools
+      # Setup Flutter first
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -175,27 +176,20 @@ jobs:
           architecture: ARM64
           cache: true
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-
-      - name: Configure git for submodules
+      - name: Setup Flutter project
         run: |
-          git config --global url."https://".insteadOf git://
-          git config --global --add safe.directory '*'
-          git config --global net.git-fetch-with-cli true
+          cd flutter
+          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
+          flutter pub get
+          flutter config --enable-macos-desktop
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
+          flutter pub add flutter_rust_bridge
+          flutter pub get
+          cd ..
 
-      - name: Update submodules
-        run: |
-          git submodule update --init --recursive
-          git submodule foreach --recursive git config --global net.git-fetch-with-cli true
-
-      # Bridge generation
-      - name: Install flutter_rust_bridge_codegen
-        run: |
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-
+      # Then do bridge generation
       - name: Generate bridge files
         run: |
           cd flutter
@@ -217,19 +211,6 @@ jobs:
           cd ..
 
       # Setup Flutter configuration
-      - name: Setup Flutter project
-        run: |
-          cd flutter
-          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
-          flutter pub get
-          flutter config --enable-macos-desktop
-          flutter pub add build_runner --dev
-          flutter pub add freezed_annotation
-          flutter pub add freezed --dev
-          flutter pub add flutter_rust_bridge
-          flutter pub get
-          cd ..
-
       - name: Patch flutter
         continue-on-error: true
         run: |
