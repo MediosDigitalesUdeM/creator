@@ -144,14 +144,14 @@ jobs:
           customHeaders: '{"Content-Type": "application/json"}'
           data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
 
-      # 3. Setup Signing
-      - name: Import the codesign cert
-        if: env.MACOS_P12_BASE64 != null
-        uses: apple-actions/import-codesign-certs@v1
-        with:
-          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
-          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
-          keychain: rustdesk
+      ## 3. Setup Signing
+      #- name: Import the codesign cert
+      #  if: env.MACOS_P12_BASE64 != null
+      #  uses: apple-actions/import-codesign-certs@v1
+      #  with:
+      #    p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+      #    p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+      #    keychain: rustdesk
 
       #- name: Import notarize key
        # if: env.MACOS_P12_BASE64 != null
@@ -161,15 +161,15 @@ jobs:
           #fileDir: ${{ github.workspace }}
           #encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
-      - name: Install rcodesign tool
-        if: env.MACOS_P12_BASE64 != null
-        shell: bash
-        run: |
-          pushd /tmp
-          wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
-          tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
-          mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
-          popd
+      #- name: Install rcodesign tool
+      #  if: env.MACOS_P12_BASE64 != null
+      #  shell: bash
+      #  run: |
+      #    pushd /tmp
+      #    wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
+      #    tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
+      #    mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
+      #    popd
 
       # 4. Setup Tools
       - name: Setup vcpkg
