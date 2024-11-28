@@ -167,6 +167,23 @@ jobs:
         with:
           prefix-key: ${{ matrix.job.os }}
 
+      # Setup vcpkg and git
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Configure git for submodules
+        run: |
+          git config --global url."https://".insteadOf git://
+          git config --global --add safe.directory '*'
+          git config --global net.git-fetch-with-cli true
+
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule foreach --recursive git config --global net.git-fetch-with-cli true
+
       # Setup Flutter first
       - name: Install Flutter
         uses: subosito/flutter-action@v2
