@@ -144,7 +144,7 @@ jobs:
           customHeaders: '{"Content-Type": "application/json"}'
           data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
 
-      ## 3. Setup Signing
+      # 3. Setup Signing
       #- name: Import the codesign cert
       #  if: env.MACOS_P12_BASE64 != null
       #  uses: apple-actions/import-codesign-certs@v1
@@ -154,12 +154,12 @@ jobs:
       #    keychain: rustdesk
 
       #- name: Import notarize key
-       # if: env.MACOS_P12_BASE64 != null
-        #uses: timheuer/base64-to-file@v1.2
-        #with:
-         # fileName: rustdesk.json
-          #fileDir: ${{ github.workspace }}
-          #encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
+      #  if: env.MACOS_P12_BASE64 != null
+      #  uses: timheuer/base64-to-file@v1.2
+      #  with:
+      #    fileName: rustdesk.json
+      #    fileDir: ${{ github.workspace }}
+      #    encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
       #- name: Install rcodesign tool
       #  if: env.MACOS_P12_BASE64 != null
@@ -192,15 +192,31 @@ jobs:
             exit 1
           fi
 
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          architecture: ARM64
-          cache: false
-          pub-cache-path: default
-          dry-run: false    
+      - name: Generate bridge files
+        run: |
+          cd flutter
+          # Create directories
+          mkdir -p lib/generated
+          mkdir -p macos/Runner
+          mkdir -p ios/Runner
+          
+          # Generate bridge code
+          ~/.cargo/bin/flutter_rust_bridge_codegen \
+            --rust-input ../src/flutter_ffi.rs \
+            --dart-output lib/generated/bridge_generated.dart \
+            --c-output macos/Runner/bridge_generated.h \
+            --dart-decl-output lib/generated/bridge_definitions.dart \
+            --class-name RustDesk \
+            --llvm-path /opt/homebrew/opt/llvm@15 \
+            --skip-add-mod-to-lib \
+            --no-build-runner
+          
+          # Copy header file
+          cp macos/Runner/bridge_generated.h ios/Runner/
+          
+          # Fix imports
+          sed -i '' 's|package:flutter_hbb/generated_bridge.dart|package:flutter_hbb/generated/bridge_generated.dart|g' lib/models/*.dart
+          cd ..
 
       - name: Setup Flutter project
         run: |
@@ -208,6 +224,11 @@ jobs:
           sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
           flutter pub get
           flutter config --enable-macos-desktop
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
+          flutter pub add flutter_rust_bridge
+          flutter pub get
           cd ..
 
       - name: Patch flutter
@@ -247,26 +268,6 @@ jobs:
       - name: Install flutter_rust_bridge_codegen
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-
-      - name: Generate bridge files
-        run: |
-          cd flutter
-          # Create directories
-          mkdir -p lib/generated
-          mkdir -p macos/Runner
-          mkdir -p ios/Runner
-          
-          # Generate bridge code
-          ~/.cargo/bin/flutter_rust_bridge_codegen \
-            --rust-input ../src/flutter_ffi.rs \
-            --dart-output lib/generated/bridge_generated.dart \
-            --c-output macos/Runner/bridge_generated.h \
-            --dart-decl-output lib/generated/bridge_definitions.dart \
-            --class-name RustDesk
-          
-          # Copy header file
-          cp macos/Runner/bridge_generated.h ios/Runner/
-          cd ..
 
       - name: cargo.toml modifications
         continue-on-error: true
@@ -314,7 +315,7 @@ jobs:
             sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
-          ./build.py --flutter --hwcodec
+          ./build.py --flutter --hwcodec --screencapturekit
 
       # 6. Packaging and Signing
       - name: Create DMG
