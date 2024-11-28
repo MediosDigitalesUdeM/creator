@@ -56,10 +56,11 @@ on:
 
 env:
   SCITER_RUST_VERSION: "1.75"
-  RUST_VERSION: "1.81"
+  RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.81"
   CARGO_NDK_VERSION: "3.1.2"
   LLVM_VERSION: "15.0.6"
-  FLUTTER_VERSION: "3.22.2"
+  FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
@@ -100,7 +101,14 @@ jobs:
         run: |
           echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $GITHUB_ENV
 
-     
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "5% complete"}'
+
       - name: Checkout source code
         if: ${{ env.VERSION != 'master' }}
         uses: actions/checkout@v4
@@ -129,34 +137,50 @@ jobs:
           brew install llvm@15
           echo "LLVM_PATH=/opt/homebrew/opt/llvm@15" >> $GITHUB_ENV
 
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
+
       # 3. Setup Signing
-      #- name: Import the codesign cert
-      #  if: env.MACOS_P12_BASE64 != null
-      #  uses: apple-actions/import-codesign-certs@v1
-      #  with:
-      #    p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
-      #    p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
-      #    keychain: rustdesk
+      - name: Import the codesign cert
+        if: env.MACOS_P12_BASE64 != null
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+          keychain: rustdesk
 
-      #- name: Import notarize key
-      #  if: env.MACOS_P12_BASE64 != null
-      #  uses: timheuer/base64-to-file@v1.2
-      #  with:
-      #    fileName: rustdesk.json
-      #    fileDir: ${{ github.workspace }}
-      #    encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
+      - name: Import notarize key
+        if: env.MACOS_P12_BASE64 != null
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: rustdesk.json
+          fileDir: ${{ github.workspace }}
+          encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
-      #- name: Install rcodesign tool
-      #  if: env.MACOS_P12_BASE64 != null
-      #  shell: bash
-      #  run: |
-      #    pushd /tmp
-      #    wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
-      #    tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
-      #    mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
-      #    popd
+      - name: Install rcodesign tool
+        if: env.MACOS_P12_BASE64 != null
+        shell: bash
+        run: |
+          pushd /tmp
+          wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
+          tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
+          mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
+          popd
 
       # 4. Setup Tools
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: ARM64
+          cache: true
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
@@ -221,7 +245,7 @@ jobs:
         run: |
           cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
       - name: Workaround for flutter issue
         run: |
@@ -232,7 +256,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ env.RUST_VERSION }}
+          toolchain: ${{ env.MAC_RUST_VERSION }}
           targets: aarch64-apple-darwin
           components: "rustfmt"
 
@@ -300,7 +324,7 @@ jobs:
             sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
-          ./build.py --flutter --hwcodec --screencapturekit
+          ./build.py --flutter --hwcodec
 
       # 6. Packaging and Signing
       - name: Create DMG
