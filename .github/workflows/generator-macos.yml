@@ -80,19 +80,14 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
-  generate-bridge:
-    uses: ./.github/workflows/bridge.yml
-    with:
-      version: ${{ fromJson(inputs.extras).version }}
-
   build-for-macOS:
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
-    needs: [generate-bridge]
     strategy:
       fail-fast: false
       matrix:
         job:
+          - { target: x86_64-apple-darwin, os: macos-13, extra-build-args: "", arch: x86_64 }
           - { target: aarch64-apple-darwin, os: macos-latest, extra-build-args: "--screencapturekit", arch: aarch64 }
     steps:
 
