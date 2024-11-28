@@ -153,13 +153,13 @@ jobs:
           p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
           keychain: rustdesk
 
-      - name: Import notarize key
-        if: env.MACOS_P12_BASE64 != null
-        uses: timheuer/base64-to-file@v1.2
-        with:
-          fileName: rustdesk.json
-          fileDir: ${{ github.workspace }}
-          encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
+      #- name: Import notarize key
+       # if: env.MACOS_P12_BASE64 != null
+        #uses: timheuer/base64-to-file@v1.2
+        #with:
+         # fileName: rustdesk.json
+          #fileDir: ${{ github.workspace }}
+          #encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
