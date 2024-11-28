@@ -218,6 +218,17 @@ jobs:
             exit 1
           fi
 
+      - name: Configure git for submodules
+        run: |
+          git config --global url."https://".insteadOf git://
+          git config --global --add safe.directory '*'
+          git config --global net.git-fetch-with-cli true
+
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule foreach --recursive git config --global net.git-fetch-with-cli true
+
       - name: Generate bridge files
         run: |
           cd flutter
