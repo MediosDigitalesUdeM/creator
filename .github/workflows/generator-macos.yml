@@ -90,7 +90,6 @@ jobs:
           - { target: x86_64-apple-darwin, os: macos-13, extra-build-args: "", arch: x86_64 }
           - { target: aarch64-apple-darwin, os: macos-latest, extra-build-args: "--screencapturekit", arch: aarch64 }
     steps:
-
       # 1. Initial Setup
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -98,40 +97,12 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-      
-      - name: Checkout source code
-        uses: actions/checkout@v4      
-
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
-        run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $GITHUB_ENV
-
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
-        run: |
-          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $GITHUB_ENV
-
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "5% complete"}'
 
       - name: Checkout source code
-        if: ${{ env.VERSION != 'master' }}
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
-          ref: refs/tags/${{ env.VERSION }}
-
-      - name: Checkout source code
-        if: ${{ env.VERSION == 'master' }}
-        uses: actions/checkout@v4
-        with:
-          repository: rustdesk/rustdesk
+          ref: ${{ env.VERSION != 'master' && format('refs/tags/{0}', env.VERSION) || 'master' }}
 
       # 2. Install Dependencies
       - name: Install build runtime
@@ -157,33 +128,46 @@ jobs:
           data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
 
       # 3. Setup Signing
-      # - name: Import the codesign cert
-      #   if: env.MACOS_P12_BASE64 != null
-      #   uses: apple-actions/import-codesign-certs@v1
-      #   with:
-      #     p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
-      #     p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
-      #     keychain: rustdesk
+      - name: Import the codesign cert
+        if: env.MACOS_P12_BASE64 != null
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+          keychain: rustdesk
 
-      # - name: Import notarize key
-      #   if: env.MACOS_P12_BASE64 != null
-      #   uses: timheuer/base64-to-file@v1.2
-      #   with:
-      #     fileName: rustdesk.json
-      #     fileDir: ${{ github.workspace }}
-      #     encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
+      - name: Import notarize key
+        if: env.MACOS_P12_BASE64 != null
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: rustdesk.json
+          fileDir: ${{ github.workspace }}
+          encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
-      # - name: Install rcodesign tool
-      #   if: env.MACOS_P12_BASE64 != null
-      #   shell: bash
-      #   run: |
-      #     pushd /tmp
-      #     wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
-      #     tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
-      #     mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
-      #     popd
+      - name: Install rcodesign tool
+        if: env.MACOS_P12_BASE64 != null
+        shell: bash
+        run: |
+          pushd /tmp
+          wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
+          tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
+          mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
+          popd
 
       # 4. Setup Tools
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: aarch64-apple-darwin
+          components: "rustfmt"
+
+      - name: Cache Rust toolchain
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+
+      # Setup Flutter and tools
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -197,21 +181,6 @@ jobs:
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
 
-      - name: Install vcpkg dependencies
-        run: |
-          if ! $VCPKG_ROOT/vcpkg \
-            install \
-            --x-install-root="$VCPKG_ROOT/installed"; then
-            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
-              echo "$_1:"
-              echo "======"
-              cat "$_1"
-              echo "======"
-              echo ""
-            done
-            exit 1
-          fi
-
       - name: Configure git for submodules
         run: |
           git config --global url."https://".insteadOf git://
@@ -223,15 +192,18 @@ jobs:
           git submodule update --init --recursive
           git submodule foreach --recursive git config --global net.git-fetch-with-cli true
 
+      # Bridge generation
+      - name: Install flutter_rust_bridge_codegen
+        run: |
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+
       - name: Generate bridge files
         run: |
           cd flutter
-          # Create directories
           mkdir -p lib/generated
           mkdir -p macos/Runner
           mkdir -p ios/Runner
           
-          # Generate bridge code
           ~/.cargo/bin/flutter_rust_bridge_codegen \
             --rust-input ../src/flutter_ffi.rs \
             --dart-output lib/generated/bridge_generated.dart \
@@ -242,13 +214,10 @@ jobs:
             --skip-add-mod-to-lib \
             --no-build-runner
           
-          # Copy header file
           cp macos/Runner/bridge_generated.h ios/Runner/
-          
-          # Fix imports
-          sed -i '' 's|package:flutter_hbb/generated_bridge.dart|package:flutter_hbb/generated/bridge_generated.dart|g' lib/models/*.dart
           cd ..
 
+      # Setup Flutter configuration
       - name: Setup Flutter project
         run: |
           cd flutter
@@ -275,17 +244,17 @@ jobs:
           sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
           grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.MAC_RUST_VERSION }}
-          targets: aarch64-apple-darwin
-          components: "rustfmt"
-
-      - name: Cache Rust toolchain
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: ${{ matrix.job.os }}
+      - name: cargo.toml modifications
+        continue-on-error: true
+        shell: bash
+        run: |
+          cp ./Cargo.toml ./Cargo.toml.bak
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
+          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
+          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
@@ -296,23 +265,6 @@ jobs:
           data: '{"uuid": "${{ inputs.uuid }}", "status": "20% complete"}'
 
       # 5. Build Process
-      - name: Install flutter_rust_bridge_codegen
-        run: |
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
-
-      - name: cargo.toml modifications
-        continue-on-error: true
-        shell: bash
-        run: |
-          cp ./Cargo.toml ./Cargo.toml.bak
-          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
-          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
-          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
-          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
-
       - name: icon stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
@@ -326,14 +278,12 @@ jobs:
       - name: Configure Flutter build
         run: |
           cd flutter/macos
-          # Create Flutter build configuration
           mkdir -p Flutter/ephemeral
           cat > Flutter/ephemeral/FlutterOutputs.xcfilelist << EOF
           $(pwd)/Flutter/ephemeral/App.framework
           $(pwd)/Flutter/ephemeral/FlutterMacOS.framework
           $(pwd)/Flutter/ephemeral/flutter_assets
           EOF
-          # Update Runner project
           /usr/libexec/PlistBuddy -c "Add :RunnerTargetForConfigCommand string Flutter/ephemeral/FlutterOutputs.xcfilelist" Runner.xcodeproj/project.pbxproj
           cd ../..
 
