@@ -162,7 +162,7 @@ jobs:
       #    fileDir: ${{ github.workspace }}
       #    encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
-      # - name: Install rcodesign tool
+      #- name: Install rcodesign tool
       #  if: env.MACOS_P12_BASE64 != null
       #  shell: bash
       #  run: |
@@ -317,18 +317,16 @@ jobs:
 
       - name: Build rustdesk
         run: |
-          if [ "aarch64-apple-darwin" = "aarch64-apple-darwin" ]; then
-            MIN_MACOS_VERSION="12.3"
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
-            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
-            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
-          fi
           ./build.py --flutter --hwcodec
 
       # 6. Packaging and Signing
-      - name: Create DMG
+      - name: create unsigned dmg
+        if: env.UPLOAD_ARTIFACT == 'true'
         run: |
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          
           cd flutter/build/macos/Build/Products/Release
           chmod -R +x RustDesk.app
           if [ "${{ inputs.appname }}" != "" ]; then
@@ -346,22 +344,21 @@ jobs:
             --hide-extension "$APP_NAME.app" \
             --app-drop-link 600 185 \
             --no-internet-enable \
-            "${{ inputs.filename }}.dmg" \
+            "${{ inputs.filename }}-arm64.dmg" \
             "./$APP_NAME.app"
           
           mkdir -p ../../../../../../SignOutput/
-          mv "${{ inputs.filename }}.dmg" ../../../../../../SignOutput/
+          mv "${{ inputs.filename }}-arm64.dmg" ../../../../../../SignOutput/
 
-      - name: Sign DMG
+      - name: Codesign app and create signed dmg
         if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
         run: |
-          echo $MACOS_P12_BASE64 | base64 --decode > certificate.p12
-          security create-keychain -p mysecretpassword build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p mysecretpassword build.keychain
-          security import certificate.p12 -k build.keychain -P $MACOS_P12_PASSWORD -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k mysecretpassword build.keychain
-          codesign --force --options runtime -s "Developer ID Application" --keychain build.keychain "./SignOutput/${{ inputs.filename }}.dmg" -vvv
+          # Sign app first
+          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict ./flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.app -vvv
+          
+          # Then sign and notarize DMG
+          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict "./SignOutput/${{ inputs.filename }}-arm64.dmg" -vvv
+          rcodesign notary-submit --api-key-path ~/.p12/api-key.json --staple "./SignOutput/${{ inputs.filename }}-arm64.dmg"
 
       # 7. Upload and Status
       - name: Upload to FTP
