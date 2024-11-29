@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /tmp/flutter_rust_bridge
-          key: vcpkg-${{ matrix.job.arch }}
+          key: vcpkg-${{ inputs.platform }}
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -67,6 +67,19 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           architecture: ${{ inputs.platform == 'macos' && 'ARM64' || 'x64' }}
           cache: true
+
+      - name: Setup Flutter project
+        run: |
+          cd flutter
+          flutter pub get
+          flutter config --enable-macos-desktop
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
+          flutter pub add flutter_rust_bridge
+          flutter pub add ffigen
+          flutter pub get
+          cd ..
 
       - name: Install flutter_rust_bridge_codegen
         run: |
@@ -77,6 +90,14 @@ jobs:
           cd flutter
           mkdir -p lib/generated
           mkdir -p ${{ inputs.platform == 'macos' && 'macos/Runner' || 'linux/runner' }}
+          
+          # Create package config first
+          flutter pub get
+          
+          # Initialize Flutter project if needed
+          if [ ! -f "pubspec.yaml" ]; then
+            flutter create .
+          fi
           
           ~/.cargo/bin/flutter_rust_bridge_codegen \
             --rust-input ../src/flutter_ffi.rs \
