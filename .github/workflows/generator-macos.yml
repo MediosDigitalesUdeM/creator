@@ -86,7 +86,7 @@ jobs:
       version: ${{ fromJson(inputs.extras).version }}
 
   build-for-macOS:
-    needs: generate-bridge
+    needs: [generate-bridge]
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
