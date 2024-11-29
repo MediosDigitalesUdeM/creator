@@ -99,12 +99,14 @@ jobs:
               os: macos-13,
               extra-build-args: "",
               arch: x86_64,
+              rust-version: "${{ env.MAC_RUST_VERSION }}"
             }
           - {
               target: aarch64-apple-darwin,
               os: macos-latest,
               extra-build-args: "--screencapturekit",
               arch: aarch64,
+              rust-version: "${{ env.MAC_RUST_VERSION }}"
             }
 
     steps:
@@ -118,8 +120,15 @@ jobs:
       - name: Restore bridge files
         uses: actions/download-artifact@v3
         with:
-          name: bridge-artifact
+          name: bridge-files
           path: ./src
+
+      - name: Verify bridge files
+        run: |
+          ls -la ./src/
+          echo "Checking for bridge files..."
+          [ -f "./src/bridge_generated.rs" ] || exit 1
+          [ -f "./src/bridge_generated.io.rs" ] || exit 1
 
       - name: Set rdgen value
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
