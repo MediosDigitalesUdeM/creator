@@ -25,7 +25,7 @@ env:
 jobs:
   generate_bridge:
     name: Generate Bridge Files
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.job.os }}
     steps:
       - name: Checkout source code
         if: ${{ inputs.version != 'master' }}
