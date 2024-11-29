@@ -54,28 +54,22 @@ on:
         type: string
 
 env:
-  SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
-  RUST_VERSION: "1.75" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
-  MAC_RUST_VERSION: "1.81" # 1.81 is requred for macos, because of https://github.com/yury/cidre requires 1.81
+  SCITER_RUST_VERSION: "1.75"
+  RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.81"
   CARGO_NDK_VERSION: "3.1.2"
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.14-1"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
-  ANDROID_FLUTTER_VERSION: "3.24.5" 
+  ANDROID_FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   NDK_VERSION: "r27b"
-  #signing keys env variable checks
-  ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
-  MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-  # To make a custom build with your own servers set the below secret values
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
   CUSTOM: "${{ inputs.custom }}"
@@ -84,14 +78,14 @@ env:
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
-  
+
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
-      upload-artifact: true
-      version: ${{ fromJson(inputs.extras).version }}
-      
+      version: ${{ fromJson(inputs.extras).version || '1.3.2' }}
+      extras: ${{ inputs.extras }}
+
   build-for-macOS:
     needs: [generate-bridge]
     name: ${{ matrix.job.target }}
@@ -102,17 +96,19 @@ jobs:
         job:
           - {
               target: x86_64-apple-darwin,
-              os: macos-13, #macos-latest or macos-14 use M1 now, https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#:~:text=14%20GB-,macos%2Dlatest%20or%20macos%2D14,-The%20macos%2Dlatestlabel
+              os: macos-13,
               extra-build-args: "",
               arch: x86_64,
+              rust-version: "${{ env.MAC_RUST_VERSION }}"
             }
           - {
               target: aarch64-apple-darwin,
               os: macos-latest,
-              # extra-build-args: "--disable-flutter-texture-render", # disable this for mac, because we see a lot of users reporting flickering both on arm and x64, and we can not confirm if texture rendering has better performance if htere is no vram, https://github.com/rustdesk/rustdesk/issues/6296
               extra-build-args: "--screencapturekit",
               arch: aarch64,
+              rust-version: "${{ env.MAC_RUST_VERSION }}"
             }
+
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -125,18 +121,18 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: bridge-artifact
-          path: ./
+          path: ./src
 
       - name: Set rdgen value
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
         run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $env:GITHUB_ENV
+          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $GITHUB_ENV
 
       - name: Set rdgen value
         if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
         run: |
-          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $env:GITHUB_ENV
-      
+          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $GITHUB_ENV
+
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
@@ -157,120 +153,83 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
-      
+
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
-      
+          toolchain: ${{ matrix.job.rust-version }}
+          targets: ${{ matrix.job.target }}
+
       - name: Install dependencies
         run: |
           brew install nasm yasm pkg-config cmake
           brew install --cask xquartz
           cargo install cargo-bundle
-          
+
       - name: Cache vcpkg
         uses: actions/cache@v3
         with:
           path: |
             ./vcpkg/installed
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('./vcpkg/vcpkg.json') }}
+          key: ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-${{ hashFiles('./vcpkg/vcpkg.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-
-            
+            ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-
+
       - name: Install vcpkg dependencies
         run: |
           git clone https://github.com/microsoft/vcpkg
           ./vcpkg/bootstrap-vcpkg.sh
-          vcpkg install libvpx:x64-osx
+          vcpkg install libvpx:${{ matrix.job.arch }}-osx
           vcpkg integrate install
-          
+
       - name: Build libvpx
         run: |
           git clone https://chromium.googlesource.com/webm/libvpx
           cd libvpx
           git checkout ${{ env.LIBVPX_VERSION }}
-          ./configure --enable-static --enable-pic --enable-vp9-highbitdepth --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-shared
+          ./configure --enable-static --enable-pic --enable-vp9-highbitdepth --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-shared --target=${{ matrix.job.target }}
           make -j$(sysctl -n hw.physicalcpu)
           sudo make install
           cd ..
-      
-      - name: Cache cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      
+
       - name: Configure Build
         run: |
-          # Create config directory if it doesn't exist
           mkdir -p src/config
+          echo "${{ env.RS_PUB_KEY }}" > ./src/key.pub
           
-          # Generate config file
           cat > src/config/build.rs << EOF
-          pub const FEATURE_DELAY_FIX: bool = ${{ github.event.inputs.delay_fix }};
-          pub const FEATURE_DISABLE_SETTINGS: bool = ${{ github.event.inputs.disable_settings }};
-          pub const FEATURE_DENY_LAN: bool = ${{ github.event.inputs.deny_lan }};
-          pub const FEATURE_PASSWORD_MODE: &str = "${{ github.event.inputs.password_mode }}";
+          pub const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";
+          pub const API_SERVER: &str = "${{ env.API_SERVER }}";
           EOF
-          
-          if [ -n "${{ github.event.inputs.permanent_password }}" ]; then
-            echo "pub const PERMANENT_PASSWORD: &str = \"${{ github.event.inputs.permanent_password }}\";" >> src/config/build.rs
-          fi
-          
-          if [ -n "${{ github.event.inputs.server_key }}" ]; then
-            echo "${{ github.event.inputs.server_key }}" > ./src/key.pub
-          fi
-          
-          # Set connection type features
-          CONNECTION_FEATURES=""
-          case "${{ github.event.inputs.connection_type }}" in
-            "incoming")
-              CONNECTION_FEATURES="--features inline,incoming_only"
-              ;;
-            "outgoing")
-              CONNECTION_FEATURES="--features inline,outgoing_only"
-              ;;
-            "both")
-              CONNECTION_FEATURES="--features inline"
-              ;;
-          esac
-          echo "CONNECTION_FEATURES=${CONNECTION_FEATURES}" >> $GITHUB_ENV
 
       - name: Build
         env:
           MACOSX_DEPLOYMENT_TARGET: "10.15"
         run: |
-          cargo build --release ${CONNECTION_FEATURES}
-          
+          cargo build --release ${{ matrix.job.extra-build-args }} --target ${{ matrix.job.target }}
+
       - name: Bundle macOS App
         run: |
-          cargo bundle --release
-          
+          cargo bundle --release --target ${{ matrix.job.target }}
+
       - name: Create DMG
         run: |
           brew install create-dmg
           create-dmg \
-            --volname "RustDesk Installer" \
+            --volname "${{ inputs.appname }}" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
-            --icon "RustDesk.app" 200 190 \
-            --hide-extension "RustDesk.app" \
+            --icon "${{ inputs.appname }}.app" 200 190 \
+            --hide-extension "${{ inputs.appname }}.app" \
             --app-drop-link 600 185 \
-            "RustDesk.dmg" \
-            "target/release/bundle/macos/RustDesk.app"
-            
+            "${{ inputs.filename }}-${{ matrix.job.arch }}.dmg" \
+            "target/${{ matrix.job.target }}/release/bundle/macos/${{ inputs.appname }}.app"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: rustdesk-macos
+          name: ${{ inputs.filename }}-macos-${{ matrix.job.arch }}
           path: |
-            RustDesk.dmg
-            target/release/bundle/macos/RustDesk.app
+            ${{ inputs.filename }}-${{ matrix.job.arch }}.dmg
+            target/${{ matrix.job.target }}/release/bundle/macos/${{ inputs.appname }}.app
