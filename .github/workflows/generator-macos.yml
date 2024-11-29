@@ -188,30 +188,10 @@ jobs:
         with:
           prefix-key: ${{ matrix.job.os }}
 
-      # Setup vcpkg and git
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-
-      - name: Create vcpkg.json
+       # Install dependencies with brew
+      - name: Install dependencies
         run: |
-          cat > vcpkg.json << 'EOF'
-          {
-            "name": "rustdesk",
-            "version": "1.0",
-            "dependencies": [
-              {
-                "name": "opus",
-                "platform": "osx"
-              }
-            ]
-          }
-          EOF    
-
-      - name: Install vcpkg dependencies
-        run: |
-          $VCPKG_ROOT/vcpkg install --triplet arm64-osx
+          brew install opus
 
       - name: Configure git for submodules
         run: |
