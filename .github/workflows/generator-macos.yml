@@ -108,7 +108,6 @@ build-for-macOS:
               arch: aarch64,
             }
     steps:
-    
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
