@@ -192,6 +192,12 @@ jobs:
       - name: Install dependencies
         run: |
           brew install opus
+          brew install libyuv
+          # If libyuv is not available directly, we might need to use a tap
+          if ! brew list libyuv &>/dev/null; then
+            brew tap homebrew/core
+            brew install --HEAD libyuv
+          fi
 
       - name: Configure git for submodules
         run: |
