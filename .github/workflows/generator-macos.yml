@@ -114,6 +114,16 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Set rdgen value
+        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
+        run: |
+          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $env:GITHUB_ENV
+
+      - name: Set rdgen value
+        if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
+        run: |
+          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $env:GITHUB_ENV
       
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
