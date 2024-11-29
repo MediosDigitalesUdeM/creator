@@ -90,7 +90,8 @@ jobs:
     uses: ./.github/workflows/bridge.yml
     with:
       upload-artifact: true
-
+      version: ${{ fromJson(inputs.extras).version }}
+      
   build-for-macOS:
     needs: [generate-bridge]
     name: ${{ matrix.job.target }}
@@ -119,6 +120,12 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@v3
+        with:
+          name: bridge-artifact
+          path: ./
 
       - name: Set rdgen value
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
