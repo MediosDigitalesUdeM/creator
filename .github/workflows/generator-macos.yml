@@ -115,11 +115,32 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       
-      - name: Checkout specific version
-        run: |
-          if [ "${{ github.event.inputs.version }}" != "master" ]; then
-            git checkout tags/${{ github.event.inputs.version }}
-          fi
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "5% complete"}'
+
+      - name: Checkout source code
+        if: ${{ env.VERSION != 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: refs/tags/${{ env.VERSION }}
+
+      - name: Checkout source code
+        if: ${{ env.VERSION == 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
+        with:
+          name: bridge-artifact
+          path: ./
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
