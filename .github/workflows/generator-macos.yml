@@ -191,7 +191,7 @@ jobs:
        # Install dependencies with brew and build libyuv
       - name: Install dependencies
         run: |
-          brew install opus cmake ninja pkg-config libvpx
+          brew install opus cmake ninja pkg-config libvpx aom
           
           # Install libyuv from source
           git clone https://chromium.googlesource.com/libyuv/libyuv
