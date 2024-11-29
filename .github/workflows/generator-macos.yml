@@ -191,7 +191,7 @@ jobs:
        # Install dependencies with brew and build libyuv
       - name: Install dependencies
         run: |
-          brew install opus cmake ninja pkg-config
+          brew install opus cmake ninja pkg-config libvpx
           
           # Install libyuv from source
           git clone https://chromium.googlesource.com/libyuv/libyuv
@@ -208,9 +208,9 @@ jobs:
           sudo ln -sf /usr/local/include/libyuv* /opt/homebrew/Cellar/libyuv/1.0/
           
           # Set environment variables for libyuv
-          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/Cellar/libyuv/1.0/lib" >> $GITHUB_ENV
-          echo "CPATH=$CPATH:/opt/homebrew/Cellar/libyuv/1.0/include" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/homebrew/Cellar/libyuv/1.0/lib/pkgconfig" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/Cellar/libyuv/1.0/lib:/opt/homebrew/lib" >> $GITHUB_ENV
+          echo "CPATH=$CPATH:/opt/homebrew/Cellar/libyuv/1.0/include:/opt/homebrew/include" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/homebrew/Cellar/libyuv/1.0/lib/pkgconfig:/opt/homebrew/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Configure git for submodules
         run: |
