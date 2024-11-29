@@ -2,9 +2,6 @@ name: Build RustDesk macOS Client
 on:
   workflow_dispatch:
     inputs:
-      on: 
-  workflow_dispatch:
-    inputs:
       server:
         description: 'Rendezvous Server'
         required: true
