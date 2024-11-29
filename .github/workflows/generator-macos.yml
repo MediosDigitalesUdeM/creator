@@ -85,9 +85,14 @@ env:
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
   
-
 jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+    with:
+      upload-artifact: true
+
   build-for-macOS:
+    needs: [generate-bridge]
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
