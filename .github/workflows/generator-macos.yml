@@ -188,16 +188,24 @@ jobs:
         with:
           prefix-key: ${{ matrix.job.os }}
 
-       # Install dependencies with brew
+       # Install dependencies with brew and build libyuv
       - name: Install dependencies
         run: |
-          brew install opus
-          brew install libyuv
-          # If libyuv is not available directly, we might need to use a tap
-          if ! brew list libyuv &>/dev/null; then
-            brew tap homebrew/core
-            brew install --HEAD libyuv
-          fi
+          brew install opus cmake ninja
+          
+          # Install libyuv from source
+          git clone https://chromium.googlesource.com/libyuv/libyuv
+          cd libyuv
+          mkdir build && cd build
+          cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build . --config Release
+          sudo cmake --install .
+          cd ../..
+          
+          # Set environment variables for libyuv
+          echo "LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib" >> $GITHUB_ENV
+          echo "CPATH=$CPATH:/usr/local/include" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Configure git for submodules
         run: |
