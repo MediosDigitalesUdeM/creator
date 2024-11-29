@@ -99,14 +99,12 @@ jobs:
               os: macos-13,
               extra-build-args: "",
               arch: x86_64,
-              rust-version: "${{ env.MAC_RUST_VERSION }}"
             }
           - {
               target: aarch64-apple-darwin,
               os: macos-latest,
               extra-build-args: "--screencapturekit",
               arch: aarch64,
-              rust-version: "${{ env.MAC_RUST_VERSION }}"
             }
 
     steps:
