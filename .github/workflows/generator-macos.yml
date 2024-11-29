@@ -66,6 +66,9 @@ env:
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   VCPKG_COMMIT_ID: "f7423ee180c4b7f40d43402c2feb3859161ef625"
+  VCPKG_DEFAULT_TRIPLET: "arm64-osx"
+  VCPKG_INSTALLED_DIR: "${{ github.workspace }}/vcpkg_installed"
+  VCPKG_DEFAULT_HOST_TRIPLET: "arm64-osx"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   NDK_VERSION: r27b
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
@@ -81,10 +84,12 @@ env:
 
 jobs:
   generate-bridge:
-    uses: ./.github/workflows/bridge.yml
+    uses: ./.github/workflows/bridge-macos-new.yml
     with:
       version: ${{ fromJson(inputs.extras).version }}
-      platform: 'macos'
+
+
+
 
   build-for-macOS:
     needs: generate-bridge
@@ -94,8 +99,8 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          - { target: x86_64-apple-darwin, os: macos-13, extra-build-args: "", arch: x86_64 }
           - { target: aarch64-apple-darwin, os: macos-latest, extra-build-args: "--screencapturekit", arch: aarch64 }
+    
     steps:
       # 1. Initial Setup
       - name: Export GitHub Actions cache environment variables
@@ -119,7 +124,6 @@ jobs:
             ./flutter/lib/generated/
             ./flutter/macos/Runner/
             ./flutter/ios/Runner/
-            ./src/
 
       # 2. Install Dependencies
       - name: Install build runtime
@@ -184,7 +188,7 @@ jobs:
         with:
           prefix-key: ${{ matrix.job.os }}
 
-      # Install dependencies with brew and build libyuv
+       # Install dependencies with brew and build libyuv
       - name: Install dependencies
         run: |
           brew install opus cmake ninja pkg-config libvpx aom
@@ -298,9 +302,16 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :RunnerTargetForConfigCommand string Flutter/ephemeral/FlutterOutputs.xcfilelist" Runner.xcodeproj/project.pbxproj
           cd ../..
 
-      - name: Build rustdesk
+      - name: Build rustdesk for MACOS
         run: |
-          ./build.py --flutter --hwcodec
+         if [ "aarch64-apple-darwin" = "aarch64-apple-darwin" ]; then
+           MIN_MACOS_VERSION="12.3"
+           sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+           sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+           sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+           sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+         fi
+         ./build.py --flutter --screencapturekit
 
       # 6. Packaging and Signing
       - name: create unsigned dmg
