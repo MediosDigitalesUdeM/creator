@@ -9,6 +9,8 @@ on:
 env:
   MAC_RUST_VERSION: "1.81"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  FLUTTER_VERSION: "3.24.5"
+  LLVM_VERSION: "15.0.6"
 
 jobs:
   generate-bridge:
