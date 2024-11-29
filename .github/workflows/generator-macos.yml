@@ -66,6 +66,9 @@ env:
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   VCPKG_COMMIT_ID: "f7423ee180c4b7f40d43402c2feb3859161ef625"
+  VCPKG_DEFAULT_TRIPLET: "arm64-osx"
+  VCPKG_INSTALLED_DIR: "${{ github.workspace }}/vcpkg_installed"
+  VCPKG_DEFAULT_HOST_TRIPLET: "arm64-osx"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   NDK_VERSION: r27b
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
@@ -190,6 +193,12 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Install vcpkg dependencies
+        run: |
+          $VCPKG_ROOT/vcpkg install \
+            opus:arm64-osx \
+            --x-install-root="$VCPKG_ROOT/installed"
 
       - name: Configure git for submodules
         run: |
