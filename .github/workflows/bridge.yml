@@ -35,7 +35,7 @@ jobs:
               os: macos-latest,
               arch: aarch64,
               extra-build-args: "",
-              flutter: "3.13.9",
+              flutter: "3.24.5",
               ref: "f6509e3fd6917aa976bad2fc684182601ebf2434",
               bridge: "1.77.1",
               date: "20231219"
