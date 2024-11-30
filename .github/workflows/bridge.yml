@@ -18,7 +18,7 @@ on:
 
 env:
   FLUTTER_VERSION: "3.24.5"
-  FLUTTER_RUST_BRIDGE_VERSION: "1.77.1"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   RUST_VERSION: "1.81"
   MAC_RUST_VERSION: "1.81" 
   VERSION: ${{ inputs.version }}
@@ -37,7 +37,7 @@ jobs:
               extra-build-args: "",
               flutter: "3.24.5",
               ref: "f6509e3fd6917aa976bad2fc684182601ebf2434",
-              bridge: "1.77.1",
+              bridge: "1.80.1",
               date: "20231219"
             }
  
