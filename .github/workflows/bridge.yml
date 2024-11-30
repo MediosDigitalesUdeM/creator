@@ -77,6 +77,13 @@ jobs:
           flutter-version: ${{ matrix.job.flutter }}
           cache: true
 
+      - name: Install flutter_rust_bridge_codegen
+        run: |
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+          CARGO_NET_RETRY: 10
+
       - name: Flutter Setup and Bridge Generation
         run: |
           cd flutter
@@ -85,9 +92,14 @@ jobs:
           flutter clean
           flutter pub get
           dart --disable-analytics
-          flutter pub run build_runner clean
-          dart run build_runner build --delete-conflicting-outputs
-          dart run flutter_rust_bridge_codegen \
+          
+          # Use dart pub instead of flutter pub for build_runner
+          dart pub global activate build_runner
+          dart pub run build_runner clean
+          dart pub run build_runner build --delete-conflicting-outputs
+          
+          # Generate bridge files
+          flutter_rust_bridge_codegen \
             --rust-input ../src/bridge_generated.rs \
             --dart-output ./lib/generated_bridge.dart \
             --c-output ./macos/Runner/bridge_generated.h \
@@ -104,6 +116,7 @@ jobs:
           CARGO_TERM_COLOR: always
           FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64
           PUB_CACHE: /Users/runner/.pub-cache
+          PATH: ${{ env.PATH }}:/Users/runner/.pub-cache/bin
 
       - name: Upload Bridge Files
         uses: actions/upload-artifact@v3
