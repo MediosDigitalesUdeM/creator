@@ -86,6 +86,9 @@ jobs:
 
       - name: Flutter Setup and Bridge Generation
         run: |
+          # Add pub cache to PATH
+          export PATH="$PATH:/Users/runner/.pub-cache/bin"
+          
           cd flutter
           flutter config --no-analytics
           flutter doctor -v
@@ -116,7 +119,6 @@ jobs:
           CARGO_TERM_COLOR: always
           FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64
           PUB_CACHE: /Users/runner/.pub-cache
-          PATH: ${{ env.PATH }}:/Users/runner/.pub-cache/bin
 
       - name: Upload Bridge Files
         uses: actions/upload-artifact@v3
