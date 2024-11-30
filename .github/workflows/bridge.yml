@@ -92,14 +92,20 @@ jobs:
           cd flutter
           flutter config --no-analytics
           flutter doctor -v
+          
+          # Clean and get dependencies
           flutter clean
           flutter pub get
+          
+          # Disable analytics
           dart --disable-analytics
           
-          # Use dart pub instead of flutter pub for build_runner
-          dart pub global activate build_runner
-          dart pub run build_runner clean
-          dart pub run build_runner build --delete-conflicting-outputs
+          # Remove old generated files
+          rm -rf .dart_tool/build
+          
+          # Run build_runner directly through Flutter
+          flutter pub run build_runner clean
+          flutter pub run build_runner build --delete-conflicting-outputs
           
           # Generate bridge files
           flutter_rust_bridge_codegen \
@@ -119,6 +125,7 @@ jobs:
           CARGO_TERM_COLOR: always
           FLUTTER_ROOT: /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64
           PUB_CACHE: /Users/runner/.pub-cache
+          DART_SDK: /Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/bin/cache/dart-sdk
 
       - name: Upload Bridge Files
         uses: actions/upload-artifact@v3
