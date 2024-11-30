@@ -17,8 +17,8 @@ on:
         default: '{}'
 
 env:
-  FLUTTER_VERSION: "3.22.3"
-  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  FLUTTER_VERSION: "3.13.9"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.77.1"
   RUST_VERSION: "1.75"
   VERSION: ${{ inputs.version }}
 
@@ -36,7 +36,7 @@ jobs:
               extra-build-args: "",
               flutter: "3.13.9",
               ref: "f6509e3fd6917aa976bad2fc684182601ebf2434",
-              bridge: "1.80.1",
+              bridge: "1.77.1",
               date: "20231219"
             }
  
@@ -82,13 +82,13 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ matrix.job.flutter }}
           cache: true
 
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+          cargo install flutter_rust_bridge_codegen@1.77.1 --features "uuid" --locked
           pushd flutter && flutter pub get && popd
 
       - name: Run flutter rust bridge
