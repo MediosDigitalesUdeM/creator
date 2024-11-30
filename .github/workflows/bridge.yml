@@ -86,8 +86,10 @@ jobs:
 
       - name: Flutter Setup and Bridge Generation
         run: |
-          # Add pub cache to PATH
+          # Add necessary paths
           export PATH="$PATH:/Users/runner/.pub-cache/bin"
+          export DART_SDK="/Users/runner/hostedtoolcache/flutter/stable-3.24.5-arm64/bin/cache/dart-sdk"
+          export PATH="$DART_SDK/bin:$PATH"
           
           cd flutter
           flutter config --no-analytics
@@ -100,14 +102,15 @@ jobs:
           # Disable analytics
           dart --disable-analytics
           
-          # Remove old generated files
+          # Remove old generated files and cache
           rm -rf .dart_tool/build
+          rm -rf build
           
-          # Run build_runner directly through Flutter
-          flutter pub run build_runner clean
-          flutter pub run build_runner build --delete-conflicting-outputs
+          # Install and run build_runner using direct path
+          dart pub add --dev build_runner
+          dart pub get
           
-          # Generate bridge files
+          # Skip build_runner for now and directly generate bridge files
           flutter_rust_bridge_codegen \
             --rust-input ../src/bridge_generated.rs \
             --dart-output ./lib/generated_bridge.dart \
