@@ -18,7 +18,7 @@ on:
 
 env:
   FLUTTER_VERSION: "3.24.5"
-  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.77.1"
   RUST_VERSION: "1.75"
   MAC_RUST_VERSION: "1.81" 
   VERSION: ${{ inputs.version }}
@@ -83,7 +83,7 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_NET_RETRY: 10
         run: |
-          cargo install flutter_rust_bridge_codegen@1.77.1 --features "uuid" --locked --verbose
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter
           git submodule update --init --recursive
           flutter pub get
