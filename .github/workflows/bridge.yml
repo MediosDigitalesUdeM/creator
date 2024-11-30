@@ -17,9 +17,10 @@ on:
         default: '{}'
 
 env:
-  FLUTTER_VERSION: "3.13.9"
+  FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.77.1"
   RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.81" 
   VERSION: ${{ inputs.version }}
 
 jobs:
