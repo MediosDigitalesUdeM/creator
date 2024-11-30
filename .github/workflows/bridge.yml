@@ -77,21 +77,30 @@ jobs:
           flutter-version: ${{ matrix.job.flutter }}
           cache: true
 
+      - name: Setup Flutter
+        run: |
+          flutter config --no-analytics
+          flutter pub global activate build_runner
+          dart pub global activate build_runner
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
       - name: Install flutter rust bridge deps
         shell: bash
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_NET_RETRY: 10
+          RUST_BACKTRACE: full
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter
           git submodule update --init --recursive
           flutter pub get
+          flutter pub run build_runner build --delete-conflicting-outputs
           popd
 
       - name: Run flutter rust bridge
         env:
-          RUST_BACKTRACE: 1
+          RUST_BACKTRACE: full
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h --verbose
