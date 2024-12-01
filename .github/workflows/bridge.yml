@@ -81,10 +81,9 @@ jobs:
 
       - name: Patch flutter
         run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.MAC_FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
-
+            cd $(dirname $(dirname $(which flutter)))
+            [[ "3.24.5" == 3.24.5 ]] && git apply /Users/runner/work/rustdesk/rustdesk/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+      
       - name: Cache Bridge
         id: cache-bridge
         uses: actions/cache@v3
