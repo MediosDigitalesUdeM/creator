@@ -72,18 +72,25 @@ jobs:
         with:
           prefix-key: bridge-${{ matrix.job.os }}
 
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Patch flutter
+        run: |
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cd $(dirname $(dirname $(which flutter)))
+          [[ "${{ env.FLUTTER_VERSION }}" == "3.24.5" ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+
       - name: Cache Bridge
         id: cache-bridge
         uses: actions/cache@v3
         with:
           path: /tmp/flutter_rust_bridge
           key: vcpkg-${{ matrix.job.arch }}
-
-      - name: Patch flutter
-        run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.4" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
       - name: Workaround for flutter issue
         shell: bash
