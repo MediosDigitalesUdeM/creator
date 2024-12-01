@@ -77,12 +77,6 @@ jobs:
       matrix:
         job:
           - {
-              target: x86_64-apple-darwin,
-              os: macos-13,
-              extra-build-args: "",
-              arch: x86_64,
-            }
-          - {
               target: aarch64-apple-darwin,
               os: macos-latest,
               extra-build-args: "",
@@ -120,8 +114,9 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ env.MAC_RUST_VERSION }} # RRUST_VERSION }}
+          toolchain: ${{ env.MAC_RUST_VERSION }}
           targets: ${{ matrix.job.target }}
+          components: rustfmt
 
       - name: Install flutter
         uses: subosito/flutter-action@v2
