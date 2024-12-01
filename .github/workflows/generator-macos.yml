@@ -56,12 +56,10 @@ on:
 env:
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  # vcpkg version: 2024.07.12
-  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
-  NDK_VERSION: "r27b"
   RUST_VERSION: "1.75"
   MAC_RUST_VERSION: "1.81"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
   VERSION: "${{ fromJson(inputs.extras).version }}"
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
@@ -147,6 +145,13 @@ jobs:
           brew install --cask xquartz
           cargo install cargo-bundle
 
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
       - name: Cache vcpkg
         uses: actions/cache@v3
         with:
@@ -157,11 +162,38 @@ jobs:
             ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-
 
       - name: Install vcpkg dependencies
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: arm64-osx
         run: |
-          git clone https://github.com/microsoft/vcpkg
-          ./vcpkg/bootstrap-vcpkg.sh
-          vcpkg install libvpx:${{ matrix.job.arch }}-osx
-          vcpkg integrate install
+          if [ ${{ matrix.job.arch }} = "aarch64" ]; then
+            if ! $VCPKG_ROOT/vcpkg \
+              install \
+              --triplet arm64-osx \
+              --x-install-root="$VCPKG_ROOT/installed"; then
+              find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+                echo "$_1:"
+                echo "======"
+                cat "$_1"
+                echo "======"
+                echo ""
+              done
+              exit 1
+            fi
+          else
+            if ! $VCPKG_ROOT/vcpkg \
+              install \
+              --triplet x64-osx \
+              --x-install-root="$VCPKG_ROOT/installed"; then
+              find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+                echo "$_1:"
+                echo "======"
+                cat "$_1"
+                echo "======"
+                echo ""
+              done
+              exit 1
+            fi
+          fi
 
       - name: Configure Build
         run: |
