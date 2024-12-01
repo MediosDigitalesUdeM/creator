@@ -85,6 +85,10 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge-macos-new.yml
+
+jobs:
   build-for-macOS:
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
