@@ -20,7 +20,7 @@ env:
 jobs:
   build-for-macOS:
     name: ${{ matrix.job.target }}
-    runs-on: ${{ matrix.job.os }}
+    runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:
