@@ -10,18 +10,14 @@ on:
         required: true
         default: '1.3.1'
         type: string
-      extras:
-        description: 'Extra build parameters'
-        required: false
-        type: string
-        default: '{}'
+       
 
 env:
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
   RUST_VERSION: "1.81"
   MAC_RUST_VERSION: "1.81" 
-  VERSION: ${{ inputs.version }}
+ 
 
 jobs:
   generate_bridge:
@@ -48,33 +44,22 @@ jobs:
         with:
           repository: rustdesk/rustdesk
           ref: refs/tags/${{ inputs.version }}
-          submodules: recursive
         
       - name: Checkout source code
         if: ${{ inputs.version == 'master' }}
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
-          submodules: recursive
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: "rustfmt"
-
-      - name: Configure git and cargo
+      - name: Install build runtime
         run: |
-          git config --global http.postBuffer 524288000
-          git config --global core.compression 0
-          git config --global http.lowSpeedLimit 1000
-          git config --global http.lowSpeedTime 300
-          git config --global url."https://".insteadOf git://
-          # Enable git fetch with CLI for cargo
-          mkdir -p ~/.cargo
-          echo '[net]' > ~/.cargo/config.toml
-          echo 'git-fetch-with-cli = true' >> ~/.cargo/config.toml
-          echo 'retry = 5' >> ~/.cargo/config.toml
+          brew install llvm create-dmg nasm cmake gcc wget ninja
+          # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
+          if command -v pkg-config &>/dev/null; then
+              echo "pkg-config is already installed"
+          else
+              brew install pkg-config
+          fi
 
       - name: Install flutter
         uses: subosito/flutter-action@v2
