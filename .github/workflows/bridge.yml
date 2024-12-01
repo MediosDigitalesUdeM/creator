@@ -76,15 +76,14 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ env.MAC_FLUTTER_VERSION }}
           cache: true
 
       - name: Patch flutter
         run: |
-          FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
-          cp ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $FLUTTER_ROOT/
-          cd $FLUTTER_ROOT
-          [[ "${{ env.FLUTTER_VERSION }}" == "3.24.5" ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cd $(dirname $(dirname $(which flutter)))
+          [[ "3.24.4" == ${{env.MAC_FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
       - name: Cache Bridge
         id: cache-bridge
