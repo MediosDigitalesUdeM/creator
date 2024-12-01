@@ -141,7 +141,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install nasm yasm pkg-config cmake
+          brew install nasm yasm pkg-config cmake ninja llvm create-dmg gcc wget
           brew install --cask xquartz
           cargo install cargo-bundle
 
