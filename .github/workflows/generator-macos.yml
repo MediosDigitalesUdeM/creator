@@ -87,8 +87,10 @@ env:
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge-macos-new.yml
+    with:
+      version: ${{ fromJson(inputs.extras).version }}
 
-jobs:
+
   build-for-macOS:
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
