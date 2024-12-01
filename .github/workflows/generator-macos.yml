@@ -137,6 +137,12 @@ jobs:
         with:
           repository: rustdesk/rustdesk
 
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
+        with:
+          name: bridge-artifact
+          path: ./
+
       - name: Import Certificate
         uses: apple-actions/import-codesign-certs@v1
         if: env.MACOS_P12_BASE64 != ''
