@@ -1,0 +1,129 @@
+name: Self-Hosted macOS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload-artifact:
+        description: 'Upload artifact'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  RUST_VERSION: "1.81"
+  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  VERSION: "1.3.3"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "f7423ee180c4b7f40d43402c2feb3859161ef625"
+
+jobs:
+  build-for-macOS:
+    name: ${{ matrix.job.target }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-13,
+              arch: x86_64,
+              flutter: "3.24.5",
+              bridge: "1.80.1"
+            }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-14,
+              arch: arm64,
+              flutter: "3.24.5",
+              bridge: "1.80.1"
+            }
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Install build dependencies
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja pkg-config
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ matrix.job.flutter }}
+          cache: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ matrix.job.target }}
+          components: "rustfmt"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+
+      - name: Install flutter_rust_bridge_codegen
+        run: |
+          cargo install flutter_rust_bridge_codegen --version ${{ matrix.job.bridge }} --features "uuid" --locked
+
+      - name: Setup Flutter project
+        run: |
+          cd flutter
+          flutter config --no-analytics
+          flutter pub get
+          
+      - name: Generate Bridge Files
+        run: |
+          cd flutter
+          flutter clean
+          flutter pub get
+          dart --disable-analytics
+          
+          # Remove old generated files and cache
+          rm -rf .dart_tool/build
+          rm -rf build
+          
+          # Generate bridge files
+          flutter_rust_bridge_codegen \
+            --rust-input ../src/bridge_generated.rs \
+            --dart-output ./lib/generated_bridge.dart \
+            --c-output ./macos/Runner/bridge_generated.h \
+            --dart-decl-output ./lib/bridge_definitions.dart \
+            --wasm
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Install vcpkg dependencies
+        run: |
+          $VCPKG_ROOT/vcpkg install libvpx libyuv opus
+
+      - name: Build RustDesk
+        run: |
+          ./build.py --flutter
+
+      - name: Create DMG
+        run: |
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          create-dmg \
+            --icon "RustDesk.app" 200 190 \
+            --hide-extension "RustDesk.app" \
+            --window-size 800 400 \
+            --app-drop-link 600 185 \
+            rustdesk-selfhosted-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg \
+            ./flutter/build/macos/Build/Products/Release/RustDesk.app
+
+      - name: Upload Artifact
+        if: inputs.upload-artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rustdesk-selfhosted-${{ matrix.job.arch }}
+          path: rustdesk-selfhosted-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg
