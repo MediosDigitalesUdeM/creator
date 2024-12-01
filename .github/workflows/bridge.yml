@@ -81,8 +81,9 @@ jobs:
 
       - name: Patch flutter
         run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
+          FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
+          cp ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $FLUTTER_ROOT/
+          cd $FLUTTER_ROOT
           [[ "${{ env.FLUTTER_VERSION }}" == "3.24.5" ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
       - name: Cache Bridge
