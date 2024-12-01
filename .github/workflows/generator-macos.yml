@@ -84,20 +84,25 @@ jobs:
             }
 
     steps:
-      - name: Checkout source code
-        if: ${{ env.VERSION != 'master' }}
-        uses: actions/checkout@v4
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
         with:
-          repository: rustdesk/rustdesk
-          ref: refs/tags/${{ env.VERSION }}
-          submodules: recursive
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Checkout source code
-        if: ${{ env.VERSION == 'master' }}
         uses: actions/checkout@v4
         with:
-          repository: rustdesk/rustdesk
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Import Certificate
+        uses: apple-actions/import-codesign-certs@v1
+        if: env.MACOS_P12_BASE64 != ''
+        with:
+          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
 
       - name: Configure git
         run: |
@@ -111,13 +116,6 @@ jobs:
           echo 'git-fetch-with-cli = true' >> ~/.cargo/config.toml
           echo 'retry = 5' >> ~/.cargo/config.toml
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.MAC_RUST_VERSION }}
-          targets: ${{ matrix.job.target }}
-          components: rustfmt
-
       - name: Install flutter
         uses: subosito/flutter-action@v2
         with:
@@ -125,20 +123,16 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Setup flutter
-        run: |
-          flutter config --no-analytics
-          flutter doctor -v
-          cd flutter
-          flutter clean
-          flutter pub get
-          cd ..
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: ${{ matrix.job.target }}
+          components: rustfmt
 
-      - name: Install dependencies
-        run: |
-          brew install nasm yasm pkg-config cmake
-          brew install --cask xquartz
-          cargo install cargo-bundle
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
 
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@v11
@@ -148,56 +142,46 @@ jobs:
           doNotCache: false
 
       - name: Cache vcpkg
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ./vcpkg/installed
-          key: ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-${{ hashFiles('./vcpkg/vcpkg.json') }}
+            ${{ github.workspace }}/vcpkg
+            !${{ github.workspace }}/vcpkg/buildtrees
+            !${{ github.workspace }}/vcpkg/packages
+            !${{ github.workspace }}/vcpkg/downloads
+          key: ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-
+
+      - name: Install dependencies
+        run: |
+          brew install nasm yasm pkg-config cmake
+          brew install --cask xquartz
+          cargo install cargo-bundle
 
       - name: Install vcpkg dependencies
         env:
           VCPKG_DEFAULT_HOST_TRIPLET: arm64-osx
         run: |
-          if [ ${{ matrix.job.arch }} = "aarch64" ]; then
-            if ! $VCPKG_ROOT/vcpkg \
-              install \
-              --triplet arm64-osx \
-              --x-install-root="$VCPKG_ROOT/installed"; then
-              find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
-                echo "$_1:"
-                echo "======"
-                cat "$_1"
-                echo "======"
-                echo ""
-              done
-              exit 1
-            fi
-          else
-            if ! $VCPKG_ROOT/vcpkg \
-              install \
-              --triplet x64-osx \
-              --x-install-root="$VCPKG_ROOT/installed"; then
-              find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
-                echo "$_1:"
-                echo "======"
-                cat "$_1"
-                echo "======"
-                echo ""
-              done
-              exit 1
-            fi
+          if ! $VCPKG_ROOT/vcpkg \
+            install \
+            libvpx:arm64-osx \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              echo "======"
+              cat "$_1"
+              echo "======"
+              echo ""
+            done
+            exit 1
           fi
 
       - name: Configure Build
         run: |
-          mkdir -p src/config
-          echo "${{ env.RS_PUB_KEY }}" > ./src/key.pub
-          cat > src/config/build.rs << EOF
-          pub const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";
-          pub const API_SERVER: &str = "${{ env.API_SERVER }}";
-          EOF
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+          echo "LIBVPX_PATH=$VCPKG_ROOT/installed/arm64-osx" >> $GITHUB_ENV
+          rustup target add ${{ matrix.job.target }}
 
       - name: Generate Flutter Rust Bridge
         run: |
@@ -208,9 +192,16 @@ jobs:
           cd ..
 
       - name: Build rustdesk
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "10.15"
         run: |
           python3 ./build.py --flutter
-          cd flutter && flutter build macos --release && cd ..
+          cd flutter
+          flutter build macos --release
+          cd ..
+
+      - name: Bundle macOS App
+        run: |
           mkdir -p target/aarch64-apple-darwin/release/bundle/macos/
           cp -r flutter/build/macos/Build/Products/Release/*.app target/aarch64-apple-darwin/release/bundle/macos/
 
@@ -227,6 +218,7 @@ jobs:
             exit 1
           fi
           
+          brew install create-dmg
           create-dmg \
             --volname "${{ inputs.appname }}" \
             --window-pos 200 120 \
