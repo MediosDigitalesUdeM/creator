@@ -64,10 +64,13 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ env.RUST_VERSION }}
+          toolchain: ${{ env.MAC_RUST_VERSION }}
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: bridge-${{ matrix.job.os }}
 
       - name: Patch flutter
         run: |
