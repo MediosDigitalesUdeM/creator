@@ -54,40 +54,20 @@ on:
         type: string
 
 env:
-  SCITER_RUST_VERSION: "1.75"
-  RUST_VERSION: "1.75"
-  MAC_RUST_VERSION: "1.81"
-  CARGO_NDK_VERSION: "3.1.2"
-  SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
-  SCITER_NASM_DEBVERSION: "2.14-1"
-  LLVM_VERSION: "15.0.6"
-  FLUTTER_VERSION: "3.24.5"
-  ANDROID_FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.16.9"
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
+  RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.75"
   VERSION: "${{ fromJson(inputs.extras).version }}"
-  NDK_VERSION: "r27b"
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
   CUSTOM: "${{ inputs.custom }}"
   UUIDFOLDER: "${{ inputs.uuid }}"
   API_SERVER: "${{ inputs.apiServer }}"
   UPLOAD_ARTIFACT: 'true'
-  SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
-  STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
-  generate-bridge:
-    uses: ./.github/workflows/bridge.yml
-    with:
-      version: ${{ fromJson(inputs.extras).version || '1.3.2' }}
-      extras: ${{ inputs.extras }}
-
   build-for-macOS:
-    needs: [generate-bridge]
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
@@ -108,62 +88,54 @@ jobs:
             }
 
     steps:
-      - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Restore bridge files
-        uses: actions/download-artifact@v3
-        with:
-          name: bridge-files
-          path: ./src
-
-      - name: Verify bridge files
-        run: |
-          ls -la ./src/
-          echo "Checking for bridge files..."
-          [ -f "./src/bridge_generated.rs" ] || exit 1
-          [ -f "./src/bridge_generated.io.rs" ] || exit 1
-
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
-        run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $GITHUB_ENV
-
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
-        run: |
-          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $GITHUB_ENV
-
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "5% complete"}'
-
       - name: Checkout source code
         if: ${{ env.VERSION != 'master' }}
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
           ref: refs/tags/${{ env.VERSION }}
+          submodules: recursive
 
       - name: Checkout source code
         if: ${{ env.VERSION == 'master' }}
         uses: actions/checkout@v4
         with:
           repository: rustdesk/rustdesk
+          submodules: recursive
+
+      - name: Configure git
+        run: |
+          git config --global http.postBuffer 524288000
+          git config --global core.compression 0
+          git config --global http.lowSpeedLimit 1000
+          git config --global http.lowSpeedTime 300
+          git config --global url."https://".insteadOf git://
+          mkdir -p ~/.cargo
+          echo '[net]' > ~/.cargo/config.toml
+          echo 'git-fetch-with-cli = true' >> ~/.cargo/config.toml
+          echo 'retry = 5' >> ~/.cargo/config.toml
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: ${{ matrix.job.rust-version }}
+          toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.job.target }}
+
+      - name: Install flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Setup flutter
+        run: |
+          flutter config --no-analytics
+          flutter doctor -v
+          cd flutter
+          flutter clean
+          flutter pub get
+          cd ..
 
       - name: Install dependencies
         run: |
@@ -187,21 +159,10 @@ jobs:
           vcpkg install libvpx:${{ matrix.job.arch }}-osx
           vcpkg integrate install
 
-      - name: Build libvpx
-        run: |
-          git clone https://chromium.googlesource.com/webm/libvpx
-          cd libvpx
-          git checkout ${{ env.LIBVPX_VERSION }}
-          ./configure --enable-static --enable-pic --enable-vp9-highbitdepth --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-shared --target=${{ matrix.job.target }}
-          make -j$(sysctl -n hw.physicalcpu)
-          sudo make install
-          cd ..
-
       - name: Configure Build
         run: |
           mkdir -p src/config
           echo "${{ env.RS_PUB_KEY }}" > ./src/key.pub
-          
           cat > src/config/build.rs << EOF
           pub const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";
           pub const API_SERVER: &str = "${{ env.API_SERVER }}";
