@@ -92,10 +92,17 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Checkout source code
+        if: ${{ env.VERSION != 'master' }}
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
+            repository: rustdesk/rustdesk
+            ref: refs/tags/${{ env.VERSION }}
+    
+      - name: Checkout source code
+        if: ${{ env.VERSION == 'master' }}
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
 
       - name: Import Certificate
         uses: apple-actions/import-codesign-certs@v1
