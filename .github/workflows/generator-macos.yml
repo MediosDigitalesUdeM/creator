@@ -77,12 +77,6 @@ jobs:
       matrix:
         job:
           - {
-              target: x86_64-apple-darwin,
-              os: macos-13,
-              extra-build-args: "",
-              arch: x86_64,
-            }
-          - {
               target: aarch64-apple-darwin,
               os: macos-latest,
               extra-build-args: "",
@@ -141,7 +135,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install nasm yasm pkg-config cmake ninja llvm create-dmg gcc wget
+          brew install nasm yasm pkg-config cmake
           brew install --cask xquartz
           cargo install cargo-bundle
 
@@ -204,29 +198,36 @@ jobs:
           pub const API_SERVER: &str = "${{ env.API_SERVER }}";
           EOF
 
-      - name: Build
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "10.15"
+      - name: Build rustdesk
         run: |
-          cargo build --release ${{ matrix.job.extra-build-args }} --target ${{ matrix.job.target }}
-
-      - name: Bundle macOS App
-        run: |
-          cargo bundle --release --target ${{ matrix.job.target }}
+          python3 ./build.py --flutter
+          cd flutter && flutter build macos --release && cd ..
+          mkdir -p target/aarch64-apple-darwin/release/bundle/macos/
+          cp -r flutter/build/macos/Build/Products/Release/*.app target/aarch64-apple-darwin/release/bundle/macos/
 
       - name: Create DMG
         run: |
-          brew install create-dmg
+          APP_NAME="${{ inputs.appname }}"
+          DMG_NAME="${{ inputs.filename }}-${{ matrix.job.arch }}.dmg"
+          APP_PATH="target/aarch64-apple-darwin/release/bundle/macos/${APP_NAME}.app"
+          
+          # Verify app exists
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Error: App bundle not found at $APP_PATH"
+            ls -la target/aarch64-apple-darwin/release/bundle/macos/
+            exit 1
+          fi
+          
           create-dmg \
             --volname "${{ inputs.appname }}" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
-            --icon "${{ inputs.appname }}.app" 200 190 \
-            --hide-extension "${{ inputs.appname }}.app" \
+            --icon "${APP_NAME}.app" 200 190 \
+            --hide-extension "${APP_NAME}.app" \
             --app-drop-link 600 185 \
-            "${{ inputs.filename }}-${{ matrix.job.arch }}.dmg" \
-            "target/${{ matrix.job.target }}/release/bundle/macos/${{ inputs.appname }}.app"
+            "$DMG_NAME" \
+            "$APP_PATH"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
