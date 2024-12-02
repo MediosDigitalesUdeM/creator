@@ -76,7 +76,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: "stable"
-          flutter-version: ${{ env.MAC_FLUTTER_VERSION }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Patch flutter
