@@ -33,6 +33,16 @@ jobs:
               os: ubuntu-20.04,
               extra-build-args: "",
             }
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-latest,
+              extra-build-args: "",
+            }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-latest,
+              extra-build-args: "",
+            }
     steps:
       - name: Checkout source code
         if: ${{ inputs.version != 'master' }}
@@ -48,6 +58,7 @@ jobs:
           repository: rustdesk/rustdesk
 
       - name: Install prerequisites
+        if: ${{ matrix.job.os == 'ubuntu-20.04' }}
         run: |
           sudo apt-get install ca-certificates -y
           sudo apt-get update -y
@@ -71,34 +82,42 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.job.target }}
-          components: "rustfmt"
+          components: "rustfmt,clippy"
 
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: bridge-${{ matrix.job.os }}
 
       - name: Cache Bridge
+        if: ${{ matrix.job.os == 'ubuntu-20.04' }}
         id: cache-bridge
         uses: actions/cache@v3
         with:
           path: /tmp/flutter_rust_bridge
           key: vcpkg-${{ matrix.job.arch }}
 
-      - name: Install flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
           cache: true
 
       - name: Install flutter rust bridge deps
+        if: ${{ matrix.job.os == 'ubuntu-20.04' }}
         shell: bash
         run: |
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter && sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml && flutter pub get && popd
 
-      - name: Run flutter rust bridge
+      - name: Install flutter_rust_bridge_codegen
+        if: ${{ matrix.job.os == 'macos-latest' }}
         run: |
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features uuid --locked
+
+      - name: Generate Bridge Files
+        run: |
+          flutter pub get
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
 
