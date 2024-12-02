@@ -1,4 +1,5 @@
-name: Build RustDesk macOS Client
+name: Build RustDesk macOS Custom Client
+run-name: Build RustDesk macOS Custom Client
 on:
   workflow_dispatch:
     inputs:
@@ -54,27 +55,21 @@ on:
         type: string
 
 env:
-  RUST_VERSION: "1.75" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
-  MAC_RUST_VERSION: "1.81" 
+  SCITER_RUST_VERSION: "1.75"
+  RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.81"
   CARGO_NDK_VERSION: "3.1.2"
-  SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
-  SCITER_NASM_DEBVERSION: "2.14-1"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
-  ANDROID_FLUTTER_VERSION: "3.24.5" 
   FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
-  # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  # vcpkg version: 2024.07.12
-  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
+  VCPKG_COMMIT_ID: "f7423ee180c4b7f40d43402c2feb3859161ef625"
   VERSION: "${{ fromJson(inputs.extras).version }}"
-  NDK_VERSION: "r27c"
-  #signing keys env variable checks
+  NDK_VERSION: r27b
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-  # To make a custom build with your own servers set the below secret values
   RS_PUB_KEY: "${{ inputs.key }}"
   RENDEZVOUS_SERVER: "${{ inputs.server }}"
   CUSTOM: "${{ inputs.custom }}"
@@ -89,6 +84,7 @@ jobs:
     uses: ./.github/workflows/bridge.yml
     with:
       version: ${{ fromJson(inputs.extras).version }}
+      platform: 'macos'
 
   build-for-macOS:
     needs: generate-bridge
@@ -98,14 +94,10 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          - {
-              target: aarch64-apple-darwin,
-              os: macos-latest,
-              extra-build-args: "",
-              arch: aarch64,
-            }
-
+          - { target: x86_64-apple-darwin, os: macos-13, extra-build-args: "", arch: x86_64 }
+          - { target: aarch64-apple-darwin, os: macos-latest, extra-build-args: "--screencapturekit", arch: aarch64 }
     steps:
+      # 1. Initial Setup
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
         with:
@@ -113,14 +105,36 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Set rdgen value
-        run: |
-          echo "STATUS_URL=${{ inputs.apiServer }}/api/updategh" >> $env:GITHUB_ENV
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: ${{ env.VERSION != 'master' && format('refs/tags/{0}', env.VERSION) || 'master' }}
 
-      - name: Set rdgen value
-        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
+      - name: Restore bridge files
+        uses: actions/download-artifact@master
+        with:
+          name: bridge-artifact-macos
+          path: |
+            ./flutter/lib/generated/
+            ./flutter/macos/Runner/
+            ./flutter/ios/Runner/
+            ./src/
+
+      # 2. Install Dependencies
+      - name: Install build runtime
         run: |
-          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $env:GITHUB_ENV
+          brew install llvm create-dmg nasm cmake gcc wget ninja
+          if command -v pkg-config &>/dev/null; then
+              echo "pkg-config is already installed"
+          else
+              brew install pkg-config
+          fi
+
+      - name: Install LLVM and Clang
+        run: |
+          brew install llvm@15
+          echo "LLVM_PATH=/opt/homebrew/opt/llvm@15" >> $GITHUB_ENV
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
@@ -128,166 +142,217 @@ jobs:
           url: ${{ env.STATUS_URL }}
           method: 'POST'
           customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ inputs.uuid }}", "status": "5% complete"}'      
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'
 
-      - name: Checkout source code
-        if: ${{ env.VERSION != 'master' }}
-        uses: actions/checkout@v4
-        with:
-            repository: rustdesk/rustdesk
-            ref: refs/tags/${{ env.VERSION }}
-    
-      - name: Checkout source code
-        if: ${{ env.VERSION == 'master' }}
-        uses: actions/checkout@v4
-        with:
-          repository: rustdesk/rustdesk
+      # 3. Setup Signing - Disabled for now
+      # - name: Import the codesign cert
+      #   if: env.MACOS_P12_BASE64 != null
+      #   uses: apple-actions/import-codesign-certs@v1
+      #   with:
+      #     p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
+      #     p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+      #     keychain: rustdesk
 
-      - name: Download bridge artifacts
-        continue-on-error: true  # Make this step optional
-        uses: actions/download-artifact@v3
-        with:
-          name: bridge-artifact
-          path: ./
+      # - name: Import notarize key
+      #   if: env.MACOS_P12_BASE64 != null
+      #   uses: timheuer/base64-to-file@v1.2
+      #   with:
+      #     fileName: rustdesk.json
+      #     fileDir: ${{ github.workspace }}
+      #     encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
-      - name: Import Certificate
-        uses: apple-actions/import-codesign-certs@v1
-        if: env.MACOS_P12_BASE64 != ''
-        with:
-          p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
-          p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
+      # - name: Install rcodesign tool
+      #   if: env.MACOS_P12_BASE64 != null
+      #   shell: bash
+      #   run: |
+      #     pushd /tmp
+      #     wget https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.22.0/apple-codesign-0.22.0-macos-universal.tar.gz
+      #     tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
+      #     mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
+      #     popd
 
-      - name: Configure git
-        run: |
-          git config --global http.postBuffer 524288000
-          git config --global core.compression 0
-          git config --global http.lowSpeedLimit 1000
-          git config --global http.lowSpeedTime 300
-          git config --global url."https://".insteadOf git://
-          mkdir -p ~/.cargo
-          echo '[net]' > ~/.cargo/config.toml
-          echo 'git-fetch-with-cli = true' >> ~/.cargo/config.toml
-          echo 'retry = 5' >> ~/.cargo/config.toml
-
-      - name: Install flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
+      # 4. Setup Tools
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.MAC_RUST_VERSION }}
-          targets: ${{ matrix.job.target }}
-          components: rustfmt
+          targets: aarch64-apple-darwin
+          components: "rustfmt"
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust toolchain
+        uses: Swatinem/rust-cache@v2
         with:
           prefix-key: ${{ matrix.job.os }}
 
-      - name: Setup vcpkg with Github Actions binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ github.workspace }}/vcpkg
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-          doNotCache: false
-
-      - name: Cache vcpkg
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ github.workspace }}/vcpkg
-            !${{ github.workspace }}/vcpkg/buildtrees
-            !${{ github.workspace }}/vcpkg/packages
-            !${{ github.workspace }}/vcpkg/downloads
-          key: ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.job.target }}-vcpkg-
-
+      # Install dependencies with brew and build libyuv
       - name: Install dependencies
         run: |
-          brew install nasm yasm pkg-config cmake
-          brew install --cask xquartz
-          cargo install cargo-bundle
-
-      - name: Install vcpkg dependencies
-        env:
-          VCPKG_DEFAULT_HOST_TRIPLET: arm64-osx
-        run: |
-          if ! $VCPKG_ROOT/vcpkg \
-            install \
-            libvpx:arm64-osx \
-            --x-install-root="$VCPKG_ROOT/installed"; then
-            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
-              echo "$_1:"
-              echo "======"
-              cat "$_1"
-              echo "======"
-              echo ""
-            done
-            exit 1
-          fi
+          brew install opus cmake ninja pkg-config libvpx aom
           
+          # Install libyuv from source
+          git clone https://chromium.googlesource.com/libyuv/libyuv
+          cd libyuv
+          mkdir build && cd build
+          cmake -DCMAKE_INSTALL_PREFIX=/opt/homebrew/Cellar/libyuv/1.0 -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build . --config Release
+          sudo cmake --install .
+          cd ../..
+          
+          # Create symlinks in Homebrew
+          sudo mkdir -p /opt/homebrew/Cellar/libyuv/1.0
+          sudo ln -sf /usr/local/lib/libyuv.* /opt/homebrew/Cellar/libyuv/1.0/
+          sudo ln -sf /usr/local/include/libyuv* /opt/homebrew/Cellar/libyuv/1.0/
+          
+          # Set environment variables for libyuv
+          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/Cellar/libyuv/1.0/lib:/opt/homebrew/lib" >> $GITHUB_ENV
+          echo "CPATH=$CPATH:/opt/homebrew/Cellar/libyuv/1.0/include:/opt/homebrew/include" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/homebrew/Cellar/libyuv/1.0/lib/pkgconfig:/opt/homebrew/lib/pkgconfig" >> $GITHUB_ENV
 
-      - name: Configure Build
+      - name: Configure git for submodules
         run: |
-          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
-          echo "LIBVPX_PATH=$VCPKG_ROOT/installed/arm64-osx" >> $GITHUB_ENV
-          rustup target add ${{ matrix.job.target }}
+          git config --global url."https://".insteadOf git://
+          git config --global --add safe.directory '*'
+          git config --global net.git-fetch-with-cli true
 
-      - name: Generate Flutter Rust Bridge
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule foreach --recursive git config --global net.git-fetch-with-cli true
+
+      # Setup Flutter first
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: ARM64
+          cache: true
+
+      - name: Setup Flutter project
         run: |
           cd flutter
+          sed -i '' 's/extended_text: 14.0.0/extended_text: 13.0.0/' pubspec.yaml
           flutter pub get
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
-          flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output ./lib/generated_bridge.dart --c-output ./macos/Runner/bridge_generated.h --rust-output ../src/bridge_generated.rs
+          flutter config --enable-macos-desktop
+          flutter pub add build_runner --dev
+          flutter pub add freezed_annotation
+          flutter pub add freezed --dev
+          flutter pub add flutter_rust_bridge
+          flutter pub get
           cd ..
+
+      # Setup Flutter configuration
+      - name: Patch flutter
+        continue-on-error: true
+        run: |
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cd $(dirname $(dirname $(which flutter)))
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+
+      - name: Workaround for flutter issue
+        run: |
+          cd "$(dirname "$(which flutter)")"
+          sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
+          grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
+
+      - name: cargo.toml modifications
+        continue-on-error: true
+        shell: bash
+        run: |
+          cp ./Cargo.toml ./Cargo.toml.bak
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
+          sed -i -e '/const KEY:/,/};/d' ./src/common.rs
+          sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "20% complete"}'
+
+      # 5. Build Process
+      - name: icon stuff
+        if: ${{ inputs.iconlink != 'false' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          mv ./res/icon.ico ./res/icon.ico.bak
+          mv ./res/icon.png ./res/icon.png.bak
+          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
+          wget -O ./res/icon.png ${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}"&"uuid=${{ fromJson(inputs.iconlink).uuid }}
+
+      - name: Configure Flutter build
+        run: |
+          cd flutter/macos
+          mkdir -p Flutter/ephemeral
+          cat > Flutter/ephemeral/FlutterOutputs.xcfilelist << EOF
+          $(pwd)/Flutter/ephemeral/App.framework
+          $(pwd)/Flutter/ephemeral/FlutterMacOS.framework
+          $(pwd)/Flutter/ephemeral/flutter_assets
+          EOF
+          /usr/libexec/PlistBuddy -c "Add :RunnerTargetForConfigCommand string Flutter/ephemeral/FlutterOutputs.xcfilelist" Runner.xcodeproj/project.pbxproj
+          cd ../..
 
       - name: Build rustdesk
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "10.15"
         run: |
-          python3 ./build.py --flutter
-          cd flutter
-          flutter build macos --release
-          cd ..
+          ./build.py --flutter --hwcodec
 
-      - name: Bundle macOS App
+      # 6. Packaging and Signing
+      - name: create unsigned dmg
+        if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          mkdir -p target/aarch64-apple-darwin/release/bundle/macos/
-          cp -r flutter/build/macos/Build/Products/Release/*.app target/aarch64-apple-darwin/release/bundle/macos/
-
-      - name: Create DMG
-        run: |
-          APP_NAME="${{ inputs.appname }}"
-          DMG_NAME="${{ inputs.filename }}-${{ matrix.job.arch }}.dmg"
-          APP_PATH="target/aarch64-apple-darwin/release/bundle/macos/${APP_NAME}.app"
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink -f "$CREATE_DMG")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
           
-          # Verify app exists
-          if [ ! -d "$APP_PATH" ]; then
-            echo "Error: App bundle not found at $APP_PATH"
-            ls -la target/aarch64-apple-darwin/release/bundle/macos/
-            exit 1
+          cd flutter/build/macos/Build/Products/Release
+          chmod -R +x RustDesk.app
+          if [ "${{ inputs.appname }}" != "" ]; then
+            mv "RustDesk.app" "${{ inputs.appname }}.app"
+            APP_NAME="${{ inputs.appname }}"
+          else
+            APP_NAME="RustDesk"
           fi
           
-          brew install create-dmg
           create-dmg \
-            --volname "${{ inputs.appname }}" \
-            --window-pos 200 120 \
+            --volname "$APP_NAME" \
             --window-size 800 400 \
             --icon-size 100 \
-            --icon "${APP_NAME}.app" 200 190 \
-            --hide-extension "${APP_NAME}.app" \
+            --icon "$APP_NAME.app" 200 190 \
+            --hide-extension "$APP_NAME.app" \
             --app-drop-link 600 185 \
-            "$DMG_NAME" \
-            "$APP_PATH"
+            --no-internet-enable \
+            "${{ inputs.filename }}-arm64.dmg" \
+            "./$APP_NAME.app"
+          
+          mkdir -p ../../../../../../SignOutput/
+          mv "${{ inputs.filename }}-arm64.dmg" ../../../../../../SignOutput/
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+      # 7. Upload and Status
+      - name: Upload to FTP
+        if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          name: ${{ inputs.filename }}-macos-${{ matrix.job.arch }}
-          path: |
-            ${{ inputs.filename }}-${{ matrix.job.arch }}.dmg
-            target/${{ matrix.job.target }}/release/bundle/macos/${{ inputs.appname }}.app
+          server: ${{ secrets.GEN_FTP_SERVER }}
+          username: ${{ secrets.GEN_FTP_USER }}
+          password: ${{ secrets.GEN_FTP_PASSWORD }}
+          local-dir: ./SignOutput/
+          server-dir: exe/${{ env.UUIDFOLDER }}/
+
+      - name: Update build status
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ ${{ job.status }} == "success" ]; then
+            STATUS="Success"
+          else
+            STATUS="Build failed"
+          fi
+          curl -X POST ${{ env.STATUS_URL }} \
+          -H "Content-Type: application/json" \
+          -d "{\"uuid\":\"${{ env.UUIDFOLDER }}\",\"status\":\"$STATUS\"}"
