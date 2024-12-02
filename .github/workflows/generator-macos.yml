@@ -19,9 +19,9 @@ on:
         default: ''
         type: string
       custom:
-        description: "Custom JSON"
+        description: "Custom JSON (includes version, appname, and other settings)"
         required: true
-        default: ''
+        default: '{"version":"1.3.3","appname":"rustdesk"}'
         type: string
       uuid:
         description: "uuid of request"
@@ -38,11 +38,6 @@ on:
         required: false
         default: 'false'
         type: string
-      appname:
-        description: "app name"
-        required: true
-        default: 'rustdesk'
-        type: string
       filename:
         description: "Filename"
         required: true
@@ -53,7 +48,6 @@ on:
         required: true
         default: '{}'
         type: string
-      
 
 env:
   SCITER_RUST_VERSION: "1.75"
@@ -67,7 +61,7 @@ env:
   TAG_NAME: "${{ inputs.upload-tag }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   VCPKG_COMMIT_ID: "f7423ee180c4b7f40d43402c2feb3859161ef625"
-  VERSION: "${{ fromJson(inputs.extras).version }}"
+  VERSION: "${{ fromJson(inputs.custom).version }}"
   NDK_VERSION: r27b
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
@@ -79,12 +73,13 @@ env:
   UPLOAD_ARTIFACT: 'true'
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}"
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
+  APP_NAME: "${{ fromJson(inputs.custom).appname }}"
 
 jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
-      version: ${{ inputs.version || '1.3.3' }}
+      version: ${{ fromJson(inputs.custom).version || '1.3.3' }}
       platform: 'macos'
 
   build-for-macOS:
@@ -112,15 +107,14 @@ jobs:
           repository: rustdesk/rustdesk
           ref: ${{ env.VERSION != 'master' && format('refs/tags/{0}', env.VERSION) || 'master' }}
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
+      - name: Download bridge files
+        uses: actions/download-artifact@v3
         with:
-          name: bridge-artifact-macos
+          name: bridge-files
           path: |
-            ./flutter/lib/generated/
+            ./flutter/lib/
             ./flutter/macos/Runner/
             ./flutter/ios/Runner/
-            ./src/
 
       # 2. Install Dependencies
       - name: Install build runtime
@@ -261,10 +255,9 @@ jobs:
         shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
-          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
+          sed -i -e 's|description = "RustDesk Remote Desktop"|description = "${{ env.APP_NAME }}"|' ./Cargo.toml
+          sed -i -e 's|ProductName = "RustDesk"|ProductName = "${{ env.APP_NAME }}"|' ./Cargo.toml
+          sed -i -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ env.APP_NAME }}"|' ./Cargo.toml
           sed -i -e '/const KEY:/,/};/d' ./src/common.rs
           sed -i -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
 
@@ -299,40 +292,31 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :RunnerTargetForConfigCommand string Flutter/ephemeral/FlutterOutputs.xcfilelist" Runner.xcodeproj/project.pbxproj
           cd ../..
 
-      - name: Build rustdesk
+      - name: Build RustDesk
         run: |
-          ./build.py --flutter --hwcodec
+          cd flutter
+          flutter clean
+          flutter pub get
+          cd ..
+          ./build.py --flutter
 
       # 6. Packaging and Signing
-      - name: create unsigned dmg
+      - name: Create DMG
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           CREATE_DMG="$(command -v create-dmg)"
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
-          
-          cd flutter/build/macos/Build/Products/Release
-          chmod -R +x RustDesk.app
-          if [ "${{ inputs.appname }}" != "" ]; then
-            mv "RustDesk.app" "${{ inputs.appname }}.app"
-            APP_NAME="${{ inputs.appname }}"
-          else
-            APP_NAME="RustDesk"
-          fi
-          
           create-dmg \
-            --volname "$APP_NAME" \
+            --icon "${{ env.APP_NAME }}.app" 200 190 \
+            --hide-extension "${{ env.APP_NAME }}.app" \
             --window-size 800 400 \
-            --icon-size 100 \
-            --icon "$APP_NAME.app" 200 190 \
-            --hide-extension "$APP_NAME.app" \
             --app-drop-link 600 185 \
-            --no-internet-enable \
-            "${{ inputs.filename }}-arm64.dmg" \
-            "./$APP_NAME.app"
+            "${{ env.APP_NAME }}-${{ env.VERSION }}-universal.dmg" \
+            ./flutter/build/macos/Build/Products/Release/"${{ env.APP_NAME }}.app"
           
           mkdir -p ../../../../../../SignOutput/
-          mv "${{ inputs.filename }}-arm64.dmg" ../../../../../../SignOutput/
+          mv "${{ env.APP_NAME }}-${{ env.VERSION }}-universal.dmg" ../../../../../../SignOutput/
 
       # 7. Upload and Status
       - name: Upload to FTP
