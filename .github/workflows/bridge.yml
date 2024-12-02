@@ -118,7 +118,7 @@ jobs:
 
           # Initialize Flutter project
           cd flutter
-          flutter create .
+          flutter create --project-name rustdesk_bridge .
           flutter pub add flutter_rust_bridge
           flutter pub add flutter_rust_bridge_utils
           flutter pub add ffigen
