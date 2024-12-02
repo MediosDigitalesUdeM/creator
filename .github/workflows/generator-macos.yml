@@ -300,7 +300,7 @@ jobs:
 
       - name: Build rustdesk
         run: |
-          ./build.py --flutter
+          ./build.py
 
       # 6. Packaging and Signing
       - name: create unsigned dmg
