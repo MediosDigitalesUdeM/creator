@@ -53,6 +53,11 @@ on:
         required: true
         default: '{}'
         type: string
+      version:
+        description: "version"
+        required: false
+        default: '1.3.3'
+        type: string
 
 env:
   SCITER_RUST_VERSION: "1.75"
@@ -83,7 +88,7 @@ jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
-      version: '1.3.3'
+      version: ${{ inputs.version || '1.3.3' }}
       platform: 'macos'
 
   build-for-macOS:
@@ -114,7 +119,7 @@ jobs:
       - name: Restore bridge files
         uses: actions/download-artifact@master
         with:
-          name: bridge-artifact
+          name: bridge-artifact-macos
           path: |
             ./flutter/lib/generated/
             ./flutter/macos/Runner/
@@ -300,14 +305,7 @@ jobs:
 
       - name: Build rustdesk
         run: |
-          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
-            MIN_MACOS_VERSION="12.3"
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
-            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
-            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
-          fi
-          ./build.py --flutter ${{ matrix.job.extra-build-args }}
+          ./build.py --flutter --hwcodec
 
       # 6. Packaging and Signing
       - name: create unsigned dmg
