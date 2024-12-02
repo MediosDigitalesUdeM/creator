@@ -92,6 +92,7 @@ jobs:
 
 
   build-for-macOS:
+    needs: generate-bridge
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
