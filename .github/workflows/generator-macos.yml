@@ -53,11 +53,7 @@ on:
         required: true
         default: '{}'
         type: string
-      version:
-        description: "version"
-        required: false
-        default: '1.3.3'
-        type: string
+      
 
 env:
   SCITER_RUST_VERSION: "1.75"
