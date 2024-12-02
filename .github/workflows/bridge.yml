@@ -102,7 +102,21 @@ jobs:
           sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
           grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
 
-      
+      - name: Generate Flutter Rust Bridge
+        run: |
+          # Install the bridge generator
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+          
+          # Create necessary directories
+          mkdir -p src flutter/lib flutter/macos/Runner flutter/ios/Runner
+          
+          # Generate the bridge
+          flutter_rust_bridge_codegen \
+            --rust-input src/flutter_ffi.rs \
+            --dart-output flutter/lib/generated_bridge.dart \
+            --c-output flutter/macos/Runner/bridge_generated.h \
+            --c-output-ios flutter/ios/Runner/bridge_generated.h \
+            --rust-output src/bridge_generated.rs
 
       - name: Upload Bridge Files
         uses: actions/upload-artifact@v3
