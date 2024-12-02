@@ -109,12 +109,21 @@ jobs:
           
           # Create necessary directories
           mkdir -p src flutter/lib flutter/macos/Runner
-          
+
           # Create basic FFI file
           mkdir -p src
           echo "// Basic FFI interface
           #[flutter_rust_bridge::frb(init)]
           pub fn init_app() {}" > src/flutter_ffi.rs
+
+          # Initialize Flutter project
+          cd flutter
+          flutter create .
+          flutter pub add flutter_rust_bridge
+          flutter pub add flutter_rust_bridge_utils
+          flutter pub add ffigen
+          flutter pub get
+          cd ..
 
           # Generate the bridge
           flutter_rust_bridge_codegen \
