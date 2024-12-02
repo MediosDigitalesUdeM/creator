@@ -105,7 +105,10 @@ jobs:
       - name: Generate Flutter Rust Bridge
         run: |
           # Install the bridge generator
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+          cargo install --version=1.80.1 flutter_rust_bridge_codegen
+          flutter create --project-name rustdesk_bridge .
+          flutter pub add flutter_rust_bridge@1.80.1
+          flutter pub get
           
           # Create necessary directories
           mkdir -p src flutter/lib flutter/macos/Runner
@@ -115,15 +118,6 @@ jobs:
           echo "// Basic FFI interface
           #[flutter_rust_bridge::frb(init)]
           pub fn init_app() {}" > src/flutter_ffi.rs
-
-          # Initialize Flutter project
-          cd flutter
-          flutter create --project-name rustdesk_bridge .
-          flutter pub add flutter_rust_bridge
-          flutter pub add flutter_rust_bridge_utils
-          flutter pub add ffigen
-          flutter pub get
-          cd ..
 
           # Generate the bridge
           flutter_rust_bridge_codegen \
