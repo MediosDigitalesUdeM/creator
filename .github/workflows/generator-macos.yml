@@ -85,7 +85,13 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+    with:
+      version: ${{ fromJson(inputs.extras).version }}
+
   build-for-macOS:
+    needs: generate-bridge
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
@@ -137,8 +143,9 @@ jobs:
         with:
           repository: rustdesk/rustdesk
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
+      - name: Download bridge artifacts
+        continue-on-error: true  # Make this step optional
+        uses: actions/download-artifact@v3
         with:
           name: bridge-artifact
           path: ./
