@@ -84,7 +84,7 @@ jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
-      version: ${{ fromJson(inputs.custom).version || '1.3.3' }}
+      version: ${{ fromJson(inputs.extras).version }}
       platform: 'macos'
 
   build-for-macOS:
