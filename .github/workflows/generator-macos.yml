@@ -86,6 +86,11 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+    with:
+      version: ${{ fromJson(inputs.extras).version }}
+
   build-for-macos-flutter:
     name: Build macOS
     runs-on: macos-latest
