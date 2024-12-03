@@ -2,7 +2,7 @@ name: Build RustDesk macOS Custom Client
 run-name: Build RustDesk macOS Custom Client
 on:
   workflow_dispatch:
-    inputs:
+      inputs:
       server:
         description: 'Rendezvous Server'
         required: true
@@ -19,9 +19,9 @@ on:
         default: ''
         type: string
       custom:
-        description: "Custom JSON (includes version, appname, and other settings)"
+        description: "Custom JSON"
         required: true
-        default: '{"version":"1.3.3","appname":"rustdesk"}'
+        default: ''
         type: string
       uuid:
         description: "uuid of request"
@@ -37,6 +37,11 @@ on:
         description: "logo link"
         required: false
         default: 'false'
+        type: string
+      appname:
+        description: "app name"
+        required: true
+        default: 'rustdesk'
         type: string
       filename:
         description: "Filename"
