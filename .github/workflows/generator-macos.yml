@@ -229,6 +229,16 @@ jobs:
             done
             exit 1
           fi
+
+      - name: Show version information (Rust, cargo, Clang)
+        shell: bash
+        run: |
+          clang --version || true
+          rustup -V
+          rustup toolchain list
+          rustup default
+          cargo -V
+          rustc -V
       
       - name: Build macOS App
         run: |
