@@ -204,6 +204,11 @@ jobs:
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
+      
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+
       - name: Build macOS App
         run: |
           cd flutter
