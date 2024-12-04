@@ -182,6 +182,7 @@ jobs:
           cache: true
 
       - name: Patch flutter
+        continue-on-error: true
         run: |
             cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
             cd $(dirname $(dirname $(which flutter)))
