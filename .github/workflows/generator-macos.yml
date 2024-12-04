@@ -201,7 +201,7 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.MAC_RUST_VERSION }}
-          targets: x86_64-apple-darwin
+          targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
       - name: Build macOS App
