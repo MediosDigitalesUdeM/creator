@@ -148,6 +148,7 @@ jobs:
               path: ./
 
       - name: Modify project files
+        shell: bash
         run: |
           # Backup files
           cp ./Cargo.toml ./Cargo.toml.bak
