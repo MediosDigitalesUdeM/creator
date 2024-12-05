@@ -299,6 +299,13 @@ jobs:
       #    name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
       #    path: rustdesk
 
+      - name: Rename rustdesk
+        if: env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          for name in rustdesk*??.dmg; do
+              mv "$name" "${name%%.dmg}-${{ matrix.job.arch }}.dmg"
+          done
+      
       - name: Package macOS App
         run: |
           cd flutter/build/macos/Build/Products/Release
