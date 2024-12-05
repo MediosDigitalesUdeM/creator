@@ -309,8 +309,9 @@ jobs:
       - name: Package macOS App
         run: |
           cd flutter/build/macos/Build/Products/Release
-          mv ${{ inputs.appname }}.app ${{ inputs.filename }}.app
-          zip -r ${{ inputs.filename }}-macos.zip ${{ inputs.filename }}.app
+          if [ -d "RustDesk.app" ]; then
+            mv "RustDesk.app" "${{ inputs.appname }}.app"
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
