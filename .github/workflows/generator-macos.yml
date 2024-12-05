@@ -302,7 +302,7 @@ jobs:
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          or name in ${{ inputs.appname }}*??.dmg; do
+          for name in ${{ inputs.appname }}*??.dmg; do
             mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
       
