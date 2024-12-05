@@ -306,18 +306,21 @@ jobs:
             mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
       
-      - name: Package macOS App
-        run: |
-          cd flutter/build/macos/Build/Products/Release
-          if [ -d "RustDesk.app" ]; then
-            mv "RustDesk.app" "${{ inputs.appname }}.app"
-          fi
+      #- name: Package macOS App
+      #  run: |
+      #    cd flutter/build/macos/Build/Products/Release
+      #    if [ -d "RustDesk.app" ]; then
+      #      mv "RustDesk.app" "${{ inputs.appname }}.app"
+      #    fi
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      - name: Publish DMG package
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: softprops/action-gh-release@v1
         with:
-          name: ${{ inputs.filename }}-macos
-          path: flutter/build/macos/Build/Products/Release/${{ inputs.filename }}-macos.zip
+          prerelease: true
+          tag_name: ${{ env.TAG_NAME }}
+          files: |
+            ${{ inputs.appname }}*-${{ matrix.job.arch }}.dmg
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
