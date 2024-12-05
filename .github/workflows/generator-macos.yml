@@ -302,8 +302,8 @@ jobs:
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          for name in rustdesk*??.dmg; do
-              mv "$name" "${name%%.dmg}-${{ matrix.job.arch }}.dmg"
+          or name in ${{ inputs.appname }}*??.dmg; do
+            mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
       
       - name: Package macOS App
