@@ -105,10 +105,6 @@ jobs:
               # extra-build-args: "--disable-flutter-texture-render", # disable this for mac, because we see a lot of users reporting flickering both on arm and x64, and we can not confirm if texture rendering has better performance if htere is no vram, https://github.com/rustdesk/rustdesk/issues/6296
               extra-build-args: "",
               arch: aarch64,
-              flutter: "3.10.6",
-              ref: "f6509e3fd6917aa976bad2fc684182601ebf2434",
-              bridge: "1.80.1",
-              date: "20231219"
             }
 
     steps:
