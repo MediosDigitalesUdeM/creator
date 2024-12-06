@@ -185,18 +185,10 @@ jobs:
           
           # Update pubspec.yaml with proper YAML formatting
           cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
-          cd flutter
-          echo "  archive: ^3.6.1" > temp_dependency.txt
-          awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
-          mv pubspec.yaml.tmp pubspec.yaml
-          rm temp_dependency.txt
-          cd ..
-
-          # Insert the new dependency after the intl line while preserving indentation
-          awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
-          mv pubspec.yaml.tmp pubspec.yaml
-          rm temp_dependency.txt
-          cd ..
+          echo "  archive: ^3.6.1" > ./flutter/temp_dependency.txt
+          awk '/intl:/{print;system("cat ./flutter/temp_dependency.txt");next}1' ./flutter/pubspec.yaml > ./flutter/pubspec.yaml.tmp
+          mv ./flutter/pubspec.yaml.tmp ./flutter/pubspec.yaml
+          rm ./flutter/temp_dependency.txt
           
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
