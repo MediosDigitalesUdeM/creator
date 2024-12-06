@@ -147,7 +147,7 @@ jobs:
               path: ./
 
       - name: cargo.toml, runner.rc name, en.rs
-        continue-on-error: true
+        continue-on-error: false
         shell: bash
         run: |
           cp ./Cargo.toml ./Cargo.toml.bak
