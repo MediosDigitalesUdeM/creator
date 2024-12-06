@@ -277,15 +277,39 @@ jobs:
           fi
           ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
 
-      # Add the signing steps here, before DMG creation
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
         run: |
           cd flutter/build/macos/Build/Products/Release
+          # Debug info
+          echo "Current directory contents:"
+          ls -la
+          echo "App bundle contents:"
+          ls -la "${{ inputs.appname }}.app" || echo "App not found"
+          ls -la "${{ inputs.appname }}.app/Contents" || echo "Contents not found"
+          
           # Decode the certificate
           echo "${{ secrets.MACOS_P12_BASE64 }}" | base64 --decode > certificate.p12
-          # Sign the app bundle
-          rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" --code-signature-flags runtime "${{ inputs.appname }}.app"
+          
+          # Sign the app bundle and its contents
+          if [ -d "${{ inputs.appname }}.app/Contents/MacOS" ]; then
+            echo "Signing main executable..."
+            rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
+              --code-signature-flags runtime "${{ inputs.appname }}.app/Contents/MacOS/*"
+            
+            echo "Signing frameworks..."
+            find "${{ inputs.appname }}.app/Contents/Frameworks" -type f -name "*" -exec \
+              rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
+              --code-signature-flags runtime {} \;
+            
+            echo "Signing main bundle..."
+            rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
+              --code-signature-flags runtime "${{ inputs.appname }}.app"
+          else
+            echo "Error: Invalid app bundle structure"
+            exit 1
+          fi
+          
           # Clean up
           rm certificate.p12
 
