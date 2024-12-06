@@ -192,11 +192,11 @@ jobs:
           rm temp_dependency.txt
           cd ..
 
-         # Insert the new dependency after the intl line while preserving indentation
-         awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
-         mv pubspec.yaml.tmp pubspec.yaml
-         rm temp_dependency.txt
-         cd ..
+          # Insert the new dependency after the intl line while preserving indentation
+          awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
+          mv pubspec.yaml.tmp pubspec.yaml
+          rm temp_dependency.txt
+          cd ..
           
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
