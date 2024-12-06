@@ -146,6 +146,11 @@ jobs:
               name: bridge-artifact
               path: ./
 
+      - name: Install ImageMagick on macOS
+        run: |
+          brew install imagemagick
+          echo "$(brew --prefix imagemagick)/bin" >> $GITHUB_PATH
+        
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: false
         shell: bash
