@@ -342,7 +342,7 @@ jobs:
       #    fi
 
       - name: Publish DMG package
-        if: env.UPLOAD_ARTIFACT == 'true'
+        if: env.UPLOAD_ARTIFACT == 'true' && inputs.upload-tag != ''
         uses: softprops/action-gh-release@v1
         with:
           prerelease: true
