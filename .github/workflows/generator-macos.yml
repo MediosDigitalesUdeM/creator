@@ -317,8 +317,8 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@master
         with:
-          name: rustdesk-unsigned-macos-${{ matrix.job.arch }}
-          path: rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg # can not upload the directory directly or tar.gz, which destroy the link structure, causing the codesign failed
+          name: ${{ inputs.appname }}-unsigned-macos-${{ matrix.job.arch }}
+          path: ${{ inputs.appname }}-${{ matrix.job.arch }}.dmg
 
       #- name: Upload unsigned
       #  if: env.UPLOAD_ARTIFACT == 'true'
