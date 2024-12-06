@@ -183,9 +183,19 @@ jobs:
           sed -i '' -e '/const KEY:/,/};/d' ./src/common.rs
           sed -i '' -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
           
+          # Update pubspec.yaml with proper YAML formatting
           cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
-          sed -i '' -e '/intl:/a\
-            \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
+          cd flutter
+          # Create a temporary file with the new dependency
+          cat > temp_dependency.txt << 'EOL'
+  archive: ^3.6.1
+EOL
+
+         # Insert the new dependency after the intl line while preserving indentation
+         awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
+         mv pubspec.yaml.tmp pubspec.yaml
+         rm temp_dependency.txt
+         cd ..
           
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
