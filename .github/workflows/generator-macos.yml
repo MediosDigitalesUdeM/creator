@@ -277,15 +277,19 @@ jobs:
           fi
           ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
 
-      #- name: create unsigned dmg
-       # if: env.UPLOAD_ARTIFACT == 'true'
-        #run: |
-         # CREATE_DMG="$(command -v create-dmg)"
-          #CREATE_DMG="$(readlink -f "$CREATE_DMG")"
-          #sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
-          #create-dmg --icon "RustDesk.app" 200 190 --hide-extension "RustDesk.app" --window-size 800 400 --app-drop-link 600 185 rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/RustDesk.app
+      # Add the signing steps here, before DMG creation
+      - name: Sign macOS app bundle
+        if: env.MACOS_P12_BASE64 != ''
+        run: |
+          cd flutter/build/macos/Build/Products/Release
+          # Decode the certificate
+          echo "${{ secrets.MACOS_P12_BASE64 }}" | base64 --decode > certificate.p12
+          # Sign the app bundle
+          rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" --code-signature-flags runtime "${{ inputs.appname }}.app"
+          # Clean up
+          rm certificate.p12
 
-      - name: Create unsigned DMG
+      - name: Create DMG
         run: |
           cd flutter/build/macos/Build/Products/Release
           # Print directory contents for debugging
@@ -342,7 +346,7 @@ jobs:
       #    fi
 
       - name: Publish DMG package
-        if: env.UPLOAD_ARTIFACT == 'true' && inputs.upload-tag != ''
+        if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@v1
         with:
           prerelease: true
