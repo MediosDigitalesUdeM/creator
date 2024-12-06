@@ -186,10 +186,11 @@ jobs:
           # Update pubspec.yaml with proper YAML formatting
           cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
           cd flutter
-          # Create a temporary file with the new dependency
-          cat > temp_dependency.txt << 'EOL'
-  archive: ^3.6.1
-EOL
+          echo "  archive: ^3.6.1" > temp_dependency.txt
+          awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
+          mv pubspec.yaml.tmp pubspec.yaml
+          rm temp_dependency.txt
+          cd ..
 
          # Insert the new dependency after the intl line while preserving indentation
          awk '/intl:/{print;system("cat temp_dependency.txt");next}1' pubspec.yaml > pubspec.yaml.tmp
