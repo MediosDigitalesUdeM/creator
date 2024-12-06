@@ -317,7 +317,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@master
         with:
-          name: ${{ inputs.appname }}-unsigned-macos-${{ matrix.job.arch }}
+          name: ${{ inputs.appname }}-${{ matrix.job.arch }}
           path: flutter/build/macos/Build/Products/Release/${{ inputs.appname }}-${{ matrix.job.arch }}.dmg
           
       #- name: Upload unsigned
