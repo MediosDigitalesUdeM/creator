@@ -346,7 +346,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           prerelease: true
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ inputs.upload-tag }}
           files: |
             ${{ inputs.appname }}*-${{ matrix.job.arch }}.dmg
 
