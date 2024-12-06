@@ -301,11 +301,25 @@ jobs:
             # Sign the app bundle and its contents
             if [ -d "${{ inputs.appname }}.app/Contents/MacOS" ]; then
               echo "Signing main executable..."
-              rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
-                --code-signature-flags runtime "${{ inputs.appname }}.app/Contents/MacOS/*"
+              MAIN_EXECUTABLE="${{ inputs.appname }}.app/Contents/MacOS/${{ inputs.appname }}"
+              if [ -f "$MAIN_EXECUTABLE" ]; then
+                rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
+                  --code-signature-flags runtime "$MAIN_EXECUTABLE"
+              else
+                echo "Main executable not found at expected path: $MAIN_EXECUTABLE"
+                # Try to find the actual executable
+                echo "Available executables in MacOS directory:"
+                ls -la "${{ inputs.appname }}.app/Contents/MacOS/"
+                ACTUAL_EXECUTABLE=$(ls "${{ inputs.appname }}.app/Contents/MacOS/" | head -n 1)
+                if [ -n "$ACTUAL_EXECUTABLE" ]; then
+                  echo "Found executable: $ACTUAL_EXECUTABLE"
+                  rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
+                    --code-signature-flags runtime "${{ inputs.appname }}.app/Contents/MacOS/$ACTUAL_EXECUTABLE"
+                fi
+              fi
               
               echo "Signing frameworks..."
-              find "${{ inputs.appname }}.app/Contents/Frameworks" -type f -name "*" -exec \
+              find "${{ inputs.appname }}.app/Contents/Frameworks" -type f -not -name ".*" -exec \
                 rcodesign sign --p12-file certificate.p12 --p12-password "${{ secrets.MACOS_P12_PASSWORD }}" \
                 --code-signature-flags runtime {} \;
               
@@ -318,7 +332,7 @@ jobs:
             fi
             
             # Clean up
-            rm certificate.p12  
+            rm certificate.p12 
 
       - name: Create DMG
         run: |
