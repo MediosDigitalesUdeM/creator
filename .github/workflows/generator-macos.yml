@@ -334,7 +334,7 @@ jobs:
 
       - name: Install build runtime
         run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja
+          brew install llvm create-dmg nasm cmake gcc wget ninja potrace
           # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
           if command -v pkg-config &>/dev/null; then
               echo "pkg-config is already installed"
@@ -373,7 +373,11 @@ jobs:
           if [ -f "$ASSETS_DIR/icon.svg" ]; then
             mv "$ASSETS_DIR/icon.svg" "$ASSETS_DIR/icon.svg.bak"
           fi
-          magick convert ./res/icon.png "$ASSETS_DIR/icon.svg"
+          # First convert PNG to PBM (bitmap)
+          magick convert ./res/icon.png ./temp_icon.pbm
+          # Then use potrace to convert to SVG
+          potrace --svg -o "$ASSETS_DIR/icon.svg" ./temp_icon.pbm
+          rm ./temp_icon.pbm
 
       - name: logo handling
         if: ${{ inputs.logolink != 'false' }}
@@ -389,7 +393,7 @@ jobs:
           wget --no-check-certificate \
             -O "$ASSETS_DIR/logo.png" \
             "${{ fromJson(inputs.logolink).url }}/get_png?filename=${{ fromJson(inputs.logolink).file }}&uuid=${{ fromJson(inputs.logolink).uuid }}"
-      
+
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
         run: |
