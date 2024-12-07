@@ -107,7 +107,7 @@ jobs:
   build-for-windows-flutter:
     name: Build Windows
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
-    runs-on: self-hosted
+    runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -356,6 +356,7 @@ jobs:
           data: '{"uuid": "${{ inputs.uuid }}", "status": "25% complete"}'
 
       - name: replace flutter icons
+        continue-on-error: true
         run: |
           cd ./flutter
           flutter pub upgrade win32
