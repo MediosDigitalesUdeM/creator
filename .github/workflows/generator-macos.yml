@@ -188,7 +188,7 @@ jobs:
 
       - name: ui.rs icon
         if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: true
+        continue-on-error: false
         shell: bash
         run: |
           cp ./src/ui.rs ./src/ui.rs.bak
