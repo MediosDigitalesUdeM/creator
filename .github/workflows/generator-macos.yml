@@ -151,7 +151,107 @@ jobs:
           brew install imagemagick
           echo "$(brew --prefix imagemagick)/bin" >> $GITHUB_PATH
 
-      - name: Icon handling
+      - name: cargo.toml, runner.rc name, en.rs
+        continue-on-error: false
+        shell: bash
+        run: |
+          cp ./Cargo.toml ./Cargo.toml.bak
+          sed -i '' -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i '' -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i '' -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
+          sed -i '' -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
+          
+          cp ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
+          sed -i '' -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i '' -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i '' -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
+          sed -i '' -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
+            
+          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
+          sed -i '' -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i '' -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
+          sed -i '' -e 's|"Copyright 2024 Purslane Ltd. All rights reserved."|"Copyright 2024"|' ./flutter/windows/runner/Runner.rc
+          sed -i '' -e 's|"rustdesk.exe"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          sed -i '' -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+           
+          cp ./src/lang/en.rs ./src/lang/en.rs.bak
+          sed -i '' -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
+           
+          sed -i '' -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
+          sed -i '' -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
+          sed -i '' -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i '' -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
+          sed -i '' -e "s|const url = 'https://rustdesk.com/';|const url = '${{ fromJson(inputs.extras).urlLink }}';|" ./flutter/lib/mobile/pages/settings_page.dart
+          sed -i '' -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/mobile/pages/settings_page.dart
+          sed -i '' -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
+            
+          sed -i '' -e '/const KEY:/,/};/d' ./src/common.rs
+          sed -i '' -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
+            
+          # Update pubspec.yaml with proper YAML formatting
+          cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
+          echo "  archive: ^3.6.1" > ./flutter/temp_dependency.txt
+          awk '/intl:/{print;system("cat ./flutter/temp_dependency.txt");next}1' ./flutter/pubspec.yaml > ./flutter/pubspec.yaml.tmp
+          mv ./flutter/pubspec.yaml.tmp ./flutter/pubspec.yaml
+          rm ./flutter/temp_dependency.txt
+
+      - name: Install flutter
+        uses: subosito/flutter-action@v2.12.0
+        with:
+            channel: "stable"
+            flutter-version: ${{ env.FLUTTER_VERSION }}
+            cache: true
+  
+      - name: Patch flutter
+        continue-on-error: true
+        run: |
+            cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+            cd $(dirname $(dirname $(which flutter)))
+            [[ "3.24.4" == 3.24.5 ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+        
+      - name: Workaround for flutter issue
+        shell: bash
+        run: |
+            cd "$(dirname "$(which flutter)")"
+            # https://github.com/flutter/flutter/issues/1.3.43
+            sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
+            grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
+  
+        
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+            toolchain: ${{ env.MAC_RUST_VERSION }}
+            targets: ${{ matrix.job.target }}
+            components: "rustfmt"
+  
+        
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+            vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+            doNotCache: false
+  
+      - name: Install vcpkg dependencies
+        run: |
+          if ! $VCPKG_ROOT/vcpkg \
+            install \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              echo "======"
+              cat "$_1"
+              echo "======"
+              echo ""
+            done
+            exit 1
+          fi
+
+      - name: Icon stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
         shell: bash
@@ -161,12 +261,12 @@ jobs:
           mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
           #echo "${{ inputs.iconbase64 }}" | base64 -d > ./res/icon.png
 
-      - name: Process icons with ImageMagick
+      - name: Magick stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
         shell: bash
         run: |
-            # Download icon using curl with additional SSL options
+             Download icon using curl with additional SSL options
             curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
               -H "User-Agent: Mozilla/5.0" \
               "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}" \
@@ -186,9 +286,9 @@ jobs:
             convert ./res/icon.png -resize 128x128 ./res/128x128.png
             convert ./res/128x128.png -resize 200% ./res/128x128@2x.png
 
-      - name: ui.rs icon
+      - name: ui.rs
         if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: false
+        continue-on-error: true
         shell: bash
         run: |
           cp ./src/ui.rs ./src/ui.rs.bak
@@ -197,58 +297,32 @@ jobs:
             b64=$(base64 < ./res/icon.png)
             sed -i '' -e "s~$SEARCH_STR.*\"~$b64\"~" ./src/ui.rs
           fi
-        
-      - name: cargo.toml, runner.rc name, en.rs
-        continue-on-error: false
-        shell: bash
-        run: |
-          cp ./Cargo.toml ./Cargo.toml.bak
-          sed -i '' -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i '' -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i '' -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./Cargo.toml
-          sed -i '' -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./Cargo.toml
-          
-          cp ./libs/portable/Cargo.toml ./libs/portable/Cargo.toml.bak
-          sed -i '' -e 's|description = "RustDesk Remote Desktop"|description = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i '' -e 's|ProductName = "RustDesk"|ProductName = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i '' -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
-          sed -i '' -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
-          
-          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
-          sed -i '' -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|"Copyright © 2024 Purslane Ltd. All rights reserved."|"Copyright © 2024"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|"rustdesk.exe"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          
-          cp ./src/lang/en.rs ./src/lang/en.rs.bak
-          sed -i '' -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
-          
-          sed -i '' -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
-          sed -i '' -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
-          sed -i '' -e "s|launchUrlString('https://rustdesk.com');|launchUrlString('${{ fromJson(inputs.extras).urlLink }}');|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
-          sed -i '' -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/desktop/pages/desktop_setting_page.dart
-          sed -i '' -e "s|const url = 'https://rustdesk.com/';|const url = '${{ fromJson(inputs.extras).urlLink }}';|" ./flutter/lib/mobile/pages/settings_page.dart
-          sed -i '' -e "s|launchUrlString('https://rustdesk.com/privacy.html')|launchUrlString('${{ fromJson(inputs.extras).urlLink }}/privacy.html')|" ./flutter/lib/mobile/pages/settings_page.dart
-          sed -i '' -e "s|https://rustdesk.com/privacy.html|${{ fromJson(inputs.extras).urlLink }}/privacy.html|" ./flutter/lib/desktop/pages/install_page.dart
-          
-          sed -i '' -e '/const KEY:/,/};/d' ./src/common.rs
-          sed -i '' -e '/let Ok(data) = sign::verify(&data, &pk)/,/};/d' ./src/common.rs
-          
-          # Update pubspec.yaml with proper YAML formatting
-          cp ./flutter/pubspec.yaml ./flutter/pubspec.yaml.bak
-          echo "  archive: ^3.6.1" > ./flutter/temp_dependency.txt
-          awk '/intl:/{print;system("cat ./flutter/temp_dependency.txt");next}1' ./flutter/pubspec.yaml > ./flutter/pubspec.yaml.tmp
-          mv ./flutter/pubspec.yaml.tmp ./flutter/pubspec.yaml
-          rm ./flutter/temp_dependency.txt
-
+           
       - name: fix connection delay
         continue-on-error: false
         if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
         shell: bash
         run: |
           sed -i '' -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
+
+      - name: replace flutter icons
+        continue-on-error: false
+        shell: bash
+        run: |
+          cd ./flutter
+          # Create required directories and files
+          mkdir -p web
+          echo '{"name":"RustDesk","short_name":"RustDesk","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","description":"A remote desktop software."}' > web/manifest.json
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>RustDesk</title></head><body></body></html>' > web/index.html
           
+          mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
+          echo '{"images":[{"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},{"size":"16x16","idiom":"mac","filename":"app_icon_32.png","scale":"2x"},{"size":"32x32","idiom":"mac","filename":"app_icon_32.png","scale":"1x"},{"size":"32x32","idiom":"mac","filename":"app_icon_64.png","scale":"2x"},{"size":"128x128","idiom":"mac","filename":"app_icon_128.png","scale":"1x"},{"size":"128x128","idiom":"mac","filename":"app_icon_256.png","scale":"2x"},{"size":"256x256","idiom":"mac","filename":"app_icon_256.png","scale":"1x"},{"size":"256x256","idiom":"mac","filename":"app_icon_512.png","scale":"2x"},{"size":"512x512","idiom":"mac","filename":"app_icon_512.png","scale":"1x"},{"size":"512x512","idiom":"mac","filename":"app_icon_1024.png","scale":"2x"}],"info":{"version":1,"author":"xcode"}}' > macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json
+          
+          flutter pub upgrade win32
+          flutter pub get
+          flutter pub run flutter_launcher_icons
+          cd ..
+      
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
         shell: bash
@@ -268,63 +342,7 @@ jobs:
           else
               brew install pkg-config
           fi
-
-      - name: Install flutter
-        uses: subosito/flutter-action@v2.12.0
-        with:
-          channel: "stable"
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-
-      - name: Patch flutter
-        continue-on-error: true
-        run: |
-            cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-            cd $(dirname $(dirname $(which flutter)))
-            [[ "3.24.4" == 3.24.5 ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
-      
-      - name: Workaround for flutter issue
-        shell: bash
-        run: |
-          cd "$(dirname "$(which flutter)")"
-          # https://github.com/flutter/flutter/issues/1.3.43
-          sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
-          grep -n '_setFramesEnabledState(false);' ../packages/flutter/lib/src/scheduler/binding.dart
-
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.MAC_RUST_VERSION }}
-          targets: ${{ matrix.job.target }}
-          components: "rustfmt"
-
-      
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: ${{ matrix.job.os }}
-
-      - name: Setup vcpkg with Github Actions binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-          doNotCache: false
-
-      - name: Install vcpkg dependencies
-        run: |
-          if ! $VCPKG_ROOT/vcpkg \
-            install \
-            --x-install-root="$VCPKG_ROOT/installed"; then
-            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
-              echo "$_1:"
-              echo "======"
-              cat "$_1"
-              echo "======"
-              echo ""
-            done
-            exit 1
-          fi
-
+  
       - name: Show version information (Rust, cargo, Clang)
         shell: bash
         run: |
@@ -346,24 +364,7 @@ jobs:
           fi
           ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
 
-      - name: replace flutter icons
-        continue-on-error: false
-        shell: bash
-        run: |
-          cd ./flutter
-          # Create required directories and files
-          mkdir -p web
-          echo '{"name":"RustDesk","short_name":"RustDesk","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","description":"A remote desktop software."}' > web/manifest.json
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>RustDesk</title></head><body></body></html>' > web/index.html
-          
-          mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
-          echo '{"images":[{"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},{"size":"16x16","idiom":"mac","filename":"app_icon_32.png","scale":"2x"},{"size":"32x32","idiom":"mac","filename":"app_icon_32.png","scale":"1x"},{"size":"32x32","idiom":"mac","filename":"app_icon_64.png","scale":"2x"},{"size":"128x128","idiom":"mac","filename":"app_icon_128.png","scale":"1x"},{"size":"128x128","idiom":"mac","filename":"app_icon_256.png","scale":"2x"},{"size":"256x256","idiom":"mac","filename":"app_icon_256.png","scale":"1x"},{"size":"256x256","idiom":"mac","filename":"app_icon_512.png","scale":"2x"},{"size":"512x512","idiom":"mac","filename":"app_icon_512.png","scale":"1x"},{"size":"512x512","idiom":"mac","filename":"app_icon_1024.png","scale":"2x"}],"info":{"version":1,"author":"xcode"}}' > macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json
-          
-          flutter pub upgrade win32
-          flutter pub get
-          flutter pub run flutter_launcher_icons
-          cd ..
-
+            
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
         run: |
