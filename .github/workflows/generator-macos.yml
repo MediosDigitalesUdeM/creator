@@ -351,6 +351,12 @@ jobs:
         shell: bash
         run: |
           cd ./flutter
+          # Create required directories and files
+          mkdir -p web
+          echo '{"name":"RustDesk","short_name":"RustDesk","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","description":"A remote desktop software."}' > web/manifest.json
+          
+          mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
+          
           flutter pub upgrade win32
           flutter pub get
           flutter pub run flutter_launcher_icons
