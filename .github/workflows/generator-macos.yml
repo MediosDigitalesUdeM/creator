@@ -241,6 +241,13 @@ jobs:
           awk '/intl:/{print;system("cat ./flutter/temp_dependency.txt");next}1' ./flutter/pubspec.yaml > ./flutter/pubspec.yaml.tmp
           mv ./flutter/pubspec.yaml.tmp ./flutter/pubspec.yaml
           rm ./flutter/temp_dependency.txt
+
+      - name: fix connection delay
+        continue-on-error: false
+        if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
+        shell: bash
+        run: |
+          sed -i '' -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
           
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
