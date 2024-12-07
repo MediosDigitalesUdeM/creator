@@ -166,8 +166,11 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-            # Download icon using curl with SSL verification disabled
-            curl -k -L "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}" -o ./res/icon.png
+            # Download icon using curl with additional SSL options
+            curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
+              -H "User-Agent: Mozilla/5.0" \
+              "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}" \
+              -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}"
             
             # Backup existing files
             mv ./res/32x32.png ./res/32x32.png.bak || true
