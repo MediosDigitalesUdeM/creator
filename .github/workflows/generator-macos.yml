@@ -363,15 +363,15 @@ jobs:
           fi
           ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
 
-     - name: icon stuff
+      - name: icon svg handling
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
         shell: bash
         run: |
           mv ./rustdesk/data/flutter_assets/assets/icon.svg ./rustdesk/data/flutter_assets/assets/icon.svg.bak || true
-          magick ./res/icon.png ./rustdesk/data/flutter_assets/assets/icon.svg
+          convert ./res/icon.png ./rustdesk/data/flutter_assets/assets/icon.svg
 
-      - name: logo stuff
+      - name: logo handling
         if: ${{ inputs.logolink != 'false' }}
         continue-on-error: true
         shell: bash
@@ -383,7 +383,7 @@ jobs:
           wget --no-check-certificate \
             -O ./rustdesk/data/flutter_assets/assets/logo.png \
             "${{ fromJson(inputs.logolink).url }}/get_png?filename=${{ fromJson(inputs.logolink).file }}&uuid=${{ fromJson(inputs.logolink).uuid }}"
-            
+
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
         run: |
