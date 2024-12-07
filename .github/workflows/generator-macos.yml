@@ -346,6 +346,16 @@ jobs:
           fi
           ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
 
+      - name: replace flutter icons
+        continue-on-error: false
+        shell: bash
+        run: |
+          cd ./flutter
+          flutter pub upgrade win32
+          flutter pub get
+          flutter pub run flutter_launcher_icons
+          cd ..
+
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
         run: |
