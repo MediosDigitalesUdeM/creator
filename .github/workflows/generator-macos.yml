@@ -185,6 +185,15 @@ jobs:
             convert ./res/icon.png -resize 64x64 ./res/64x64.png
             convert ./res/icon.png -resize 128x128 ./res/128x128.png
             convert ./res/128x128.png -resize 200% ./res/128x128@2x.png
+
+      - name: ui.rs icon
+        if: ${{ inputs.iconlink != 'false' }}
+        continue-on-error: false
+        shell: bash
+        run: |
+          cp ./src/ui.rs ./src/ui.rs.bak
+          b64=$(base64 < ./res/icon.png)
+          sed -i '' -e "s|iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAEiuAABIrgHwmhA7AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAEx9JREFUeJztnXmYHMV5h9+vZnZ0rHYRum8J4/AErQlgAQbMsRIWBEFCjK2AgwTisGILMBFCIMug1QLiPgIYE/QY2QQwiMVYjoSlODxEAgLEHMY8YuUEbEsOp3Z1X7vanf7yR8/MztEz0zPTPTO7M78/tnurvqn6uuqdr6q7a7pFVelrkpaPhhAMTEaYjJHDUWsEARkODANGAfWgINEPxLb7QNtBPkdoR7Ud0T8iphUTbtXp4z8pyQH5KOntAEhL2yCCnALW6aAnIDQAI+3MqFHkGJM73BkCO93JXnQnsAl4C8MGuoIv69mj2rw
         
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: false
