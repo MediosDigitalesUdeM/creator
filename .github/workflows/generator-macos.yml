@@ -188,12 +188,11 @@ jobs:
 
       - name: ui.rs icon
         if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: false
+        continue-on-error: true
         shell: bash
         run: |
           cp ./src/ui.rs ./src/ui.rs.bak
-          if [ -n "${{ inputs.iconlink }}" ]; then
-            curl -L "${{ inputs.iconlink }}" -o ./res/icon.png
+          if [ -f "./res/icon.png" ]; then
             SEARCH_STR="iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAEiuAABIrgHwmhA7AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAEx9JREFUeJztnXmYHMV5h9"
             b64=$(base64 < ./res/icon.png)
             sed -i '' "s/$SEARCH_STR.*\"/$b64\"/" ./src/ui.rs
