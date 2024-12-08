@@ -301,9 +301,9 @@ jobs:
             generate_tray_icons "./temp_icon.png"
             
             # Create Contents.json for AppIcon
-            cat > ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json << 'EOL'
+            cat > "./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json" << "EOJSON"
 {
-  "images" : [
+  "images": [
     {"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},
     {"size":"16x16","idiom":"mac","filename":"app_icon_16@2x.png","scale":"2x"},
     {"size":"32x32","idiom":"mac","filename":"app_icon_32.png","scale":"1x"},
@@ -315,62 +315,62 @@ jobs:
     {"size":"512x512","idiom":"mac","filename":"app_icon_512.png","scale":"1x"},
     {"size":"512x512","idiom":"mac","filename":"app_icon_512@2x.png","scale":"2x"}
   ],
-  "info" : {
-    "version" : 1,
-    "author" : "xcode"
+  "info": {
+    "version": 1,
+    "author": "xcode"
   }
 }
-EOL
-            
+EOJSON
+
             # Create Contents.json for TrayIcon
-            cat > ./flutter/macos/Runner/Assets.xcassets/TrayIcon.imageset/Contents.json << 'EOL'
+            cat > "./flutter/macos/Runner/Assets.xcassets/TrayIcon.imageset/Contents.json" << "EOJSON"
 {
-  "images" : [
+  "images": [
     {
-      "idiom" : "universal",
-      "filename" : "tray_icon.png",
-      "scale" : "1x"
+      "idiom": "universal",
+      "filename": "tray_icon.png",
+      "scale": "1x"
     },
     {
-      "idiom" : "universal",
-      "filename" : "tray_icon@2x.png",
-      "scale" : "2x"
+      "idiom": "universal",
+      "filename": "tray_icon@2x.png",
+      "scale": "2x"
     }
   ],
-  "info" : {
-    "version" : 1,
-    "author" : "xcode"
+  "info": {
+    "version": 1,
+    "author": "xcode"
   },
-  "properties" : {
-    "template-rendering-intent" : "template"
+  "properties": {
+    "template-rendering-intent": "template"
   }
 }
-EOL
-            
+EOJSON
+
             # Create Contents.json for TrayIconDark
-            cat > ./flutter/macos/Runner/Assets.xcassets/TrayIconDark.imageset/Contents.json << 'EOL'
+            cat > "./flutter/macos/Runner/Assets.xcassets/TrayIconDark.imageset/Contents.json" << "EOJSON"
 {
-  "images" : [
+  "images": [
     {
-      "idiom" : "universal",
-      "filename" : "tray_icon_dark.png",
-      "scale" : "1x"
+      "idiom": "universal",
+      "filename": "tray_icon_dark.png",
+      "scale": "1x"
     },
     {
-      "idiom" : "universal",
-      "filename" : "tray_icon_dark@2x.png",
-      "scale" : "2x"
+      "idiom": "universal",
+      "filename": "tray_icon_dark@2x.png",
+      "scale": "2x"
     }
   ],
-  "info" : {
-    "version" : 1,
-    "author" : "xcode"
+  "info": {
+    "version": 1,
+    "author": "xcode"
   },
-  "properties" : {
-    "template-rendering-intent" : "template"
+  "properties": {
+    "template-rendering-intent": "template"
   }
 }
-EOL
+EOJSON
             
             # Cleanup
             rm -f ./temp_icon.png
