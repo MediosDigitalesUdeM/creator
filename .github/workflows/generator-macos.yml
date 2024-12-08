@@ -89,8 +89,8 @@ jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
-      version: ${{ fromJson(inputs.extras).version }}
-
+      version: version: ${{ inputs.version }}
+      
   build-for-macos-flutter:
     name: Build macOS
     runs-on: macos-latest
@@ -302,7 +302,7 @@ jobs:
             
             # Create Contents.json for AppIcon
             cat > "./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json" << "EOJSON"
-          {
+         {
   "images": [
     {"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},
     {"size":"16x16","idiom":"mac","filename":"app_icon_16@2x.png","scale":"2x"},
