@@ -185,8 +185,8 @@ jobs:
           sed -i '' -e 's|<key>NSHumanReadableCopyright</key>\s*<string>$(PRODUCT_COPYRIGHT)</string>|<key>NSHumanReadableCopyright</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
           
           # MACSTUFF Update window title
-          cp ./flutter/macos/Runner/AppInfo.xcconfig ./flutter/macos/Runner/AppInfo.xcconfig.bak
-          sed -i '' -e 's|PRODUCT_NAME = "RustDesk"|PRODUCT_NAME = "${{ inputs.appname }}"|' ./flutter/macos/Runner/AppInfo.xcconfig
+          cp ./flutter/macos/Runner/Configs/AppInfo.xcconfig ./flutter/macos/Runner/Configs/AppInfo.xcconfig.bak
+          sed -i '' -e 's|PRODUCT_NAME = "RustDesk"|PRODUCT_NAME = "${{ inputs.appname }}"|' ./flutter/macos/Runner/Configs/AppInfo.xcconfig
 
 
 
