@@ -177,13 +177,19 @@ jobs:
           # MACSTUFF Backup the original Info.plist
           cp ./flutter/macos/Runner/Info.plist ./flutter/macos/Runner/Info.plist.bak
          
-          # Update application name and display name
+          # MACSTUFF Update application name and display name
           sed -i '' -e 's|<key>CFBundleName</key>\s*<string>$(PRODUCT_NAME)</string>|<key>CFBundleName</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
           sed -i '' -e 's|<key>CFBundleDisplayName</key>\s*<string>$(PRODUCT_NAME)</string>|<key>CFBundleDisplayName</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
 
-          # Update copyright information if needed
+          # MACSTUFF Update copyright information if needed
           sed -i '' -e 's|<key>NSHumanReadableCopyright</key>\s*<string>$(PRODUCT_COPYRIGHT)</string>|<key>NSHumanReadableCopyright</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
           
+          # MACSTUFF Update window title
+          cp ./flutter/macos/Runner/AppInfo.xcconfig ./flutter/macos/Runner/AppInfo.xcconfig.bak
+          sed -i '' -e 's|PRODUCT_NAME = "RustDesk"|PRODUCT_NAME = "${{ inputs.appname }}"|' ./flutter/macos/Runner/AppInfo.xcconfig
+
+
+
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           cp ./src/lang/nl.rs ./src/lang/nl.rs.bak
           sed -i '' -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
