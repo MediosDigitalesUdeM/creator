@@ -151,6 +151,16 @@ jobs:
           brew install imagemagick
           echo "$(brew --prefix imagemagick)/bin" >> $GITHUB_PATH
 
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja potrace
+          # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
+          if command -v pkg-config &>/dev/null; then
+              echo "pkg-config is already installed"
+          else
+              brew install pkg-config
+          fi
+      
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: false
         shell: bash
@@ -333,17 +343,7 @@ jobs:
           tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
           mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
           popd
-
-      - name: Install build runtime
-        run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja potrace
-          # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
-          if command -v pkg-config &>/dev/null; then
-              echo "pkg-config is already installed"
-          else
-              brew install pkg-config
-          fi
-  
+       
       - name: Show version information (Rust, cargo, Clang)
         shell: bash
         run: |
