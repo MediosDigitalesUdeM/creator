@@ -151,16 +151,6 @@ jobs:
           brew install imagemagick
           echo "$(brew --prefix imagemagick)/bin" >> $GITHUB_PATH
 
-      - name: Install build runtime
-        run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja potrace
-          # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
-          if command -v pkg-config &>/dev/null; then
-              echo "pkg-config is already installed"
-          else
-              brew install pkg-config
-          fi
-      
       - name: cargo.toml, runner.rc name, en.rs
         continue-on-error: false
         shell: bash
@@ -260,42 +250,53 @@ jobs:
             exit 1
           fi
 
-      - name: Icon stuff
-        if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: false
-        shell: bash
-        run: |
-          mv ./res/icon.ico ./res/icon.ico.bak
-          mv ./res/icon.png ./res/icon.png.bak
-          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
-          mv ./res/mac-icon.png ./res/mac-icon.png.bak
-          mv ./res/mac-tray-dark-x2.png ./res/mac-tray-dark-x2.png.bak
-          #echo "${{ inputs.iconbase64 }}" | base64 -d > ./res/icon.png
-
       - name: Magick stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: false
         shell: bash
         run: |
           # Download icon using curl with additional SSL options
-            curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
-              -H "User-Agent: Mozilla/5.0" \
-              "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}" \
-              -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}"
+          curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
+            -H "User-Agent: Mozilla/5.0" \
+            "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}" \
+            -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}&uuid=${{ fromJson(inputs.iconlink).uuid }}"
             
-            # Backup existing files
-            mv ./res/32x32.png ./res/32x32.png.bak || true
-            mv ./res/64x64.png ./res/64x64.png.bak || true
-            mv ./res/128x128.png ./res/128x128.png.bak || true
-            mv ./res/128x128@2x.png ./res/128x128@2x.png.bak || true
+          # Backup existing files
+          mv ./res/32x32.png ./res/32x32.png.bak || true
+          mv ./res/64x64.png ./res/64x64.png.bak || true
+          mv ./res/128x128.png ./res/128x128.png.bak || true
+          mv ./res/128x128@2x.png ./res/128x128@2x.png.bak || true
             
-            # Create ico and resize images
-            convert ./res/icon.png -define icon:auto-resize=256,64,48,32,16 ./res/icon.ico
-            cp ./res/icon.ico ./res/tray-icon.ico
-            convert ./res/icon.png -resize 32x32 ./res/32x32.png
-            convert ./res/icon.png -resize 64x64 ./res/64x64.png
-            convert ./res/icon.png -resize 128x128 ./res/128x128.png
-            convert ./res/128x128.png -resize 200% ./res/128x128@2x.png
+          # Create ico and resize images
+          magick convert ./res/icon.png -define icon:auto-resize=256,64,48,32,16 ./res/icon.ico
+          cp ./res/icon.ico ./res/tray-icon.ico
+          magick convert ./res/icon.png -resize 32x32 ./res/32x32.png
+          magick convert ./res/icon.png -resize 64x64 ./res/64x64.png
+          magick convert ./res/icon.png -resize 128x128 ./res/128x128.png
+          magick convert ./res/128x128.png -resize 200% ./res/128x128@2x.png
+
+          # Create macOS specific icons - ensure they're in the res directory
+          magick convert ./res/icon.png -resize 128x128 ./res/mac-icon.png
+          # Create dark mode tray icon
+          magick convert ./res/icon.png -resize 22x22 -colorspace gray -alpha set -background none -channel A -evaluate set 100% ./res/mac-tray-dark-x2.png
+          # Create light mode tray icon
+          magick convert ./res/icon.png -resize 22x22 -negate -colorspace gray -alpha set -background none -channel A -evaluate set 100% ./res/mac-tray-light-x2.png
+          
+          # Verify files exist
+          ls -la ./res/mac-tray-dark-x2.png
+          ls -la ./res/mac-tray-light-x2.png
+          ls -la ./res/mac-icon.png
+
+      - name: Build rustdesk
+        run: |
+          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
+            MIN_MACOS_VERSION="12.3"
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+          fi
+          ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
 
       - name: ui.rs
         if: ${{ inputs.iconlink != 'false' }}
@@ -343,7 +344,17 @@ jobs:
           tar -zxvf apple-codesign-0.22.0-macos-universal.tar.gz
           mv apple-codesign-0.22.0-macos-universal/rcodesign /usr/local/bin
           popd
-       
+
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg nasm cmake gcc wget ninja potrace
+          # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
+          if command -v pkg-config &>/dev/null; then
+              echo "pkg-config is already installed"
+          else
+              brew install pkg-config
+          fi
+  
       - name: Show version information (Rust, cargo, Clang)
         shell: bash
         run: |
@@ -354,17 +365,6 @@ jobs:
           cargo -V
           rustc -V
       
-      - name: Build rustdesk
-        run: |
-          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
-            MIN_MACOS_VERSION="12.3"
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
-            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
-            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
-          fi
-          ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
-
       - name: icon svg handling
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
