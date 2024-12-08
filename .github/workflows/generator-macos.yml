@@ -229,9 +229,11 @@ jobs:
           rm ./flutter/temp_dependency.txt
 
       - name: Set up custom metadata and icons
+        shell: bash
         run: |
           # Backup original files
           cp ./flutter/macos/Runner/Info.plist ./flutter/macos/Runner/Info.plist.bak
+          
           # Enhanced metadata customization
           CURRENT_YEAR=$(date +%Y)
           # Update Info.plist with extended metadata
