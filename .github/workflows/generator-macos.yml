@@ -173,9 +173,21 @@ jobs:
           sed -i '' -e 's|"Copyright 2024 Purslane Ltd. All rights reserved."|"Copyright 2024"|' ./flutter/windows/runner/Runner.rc
           sed -i '' -e 's|"rustdesk.exe"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
           sed -i '' -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-           
+
+          # MACSTUFF Backup the original Info.plist
+          cp ./flutter/macos/Runner/Info.plist ./flutter/macos/Runner/Info.plist.bak
+         
+          # Update application name and display name
+          sed -i '' -e 's|<key>CFBundleName</key>\s*<string>$(PRODUCT_NAME)</string>|<key>CFBundleName</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
+          sed -i '' -e 's|<key>CFBundleDisplayName</key>\s*<string>$(PRODUCT_NAME)</string>|<key>CFBundleDisplayName</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
+
+          # Update copyright information if needed
+          sed -i '' -e 's|<key>NSHumanReadableCopyright</key>\s*<string>$(PRODUCT_COPYRIGHT)</string>|<key>NSHumanReadableCopyright</key>\n\t<string>${{ inputs.appname }}</string>|' ./flutter/macos/Runner/Info.plist
+          
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
+          cp ./src/lang/nl.rs ./src/lang/nl.rs.bak
           sed -i '' -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/en.rs
+          sed -i '' -e 's|RustDesk|${{ inputs.appname }}|' ./src/lang/nl.rs
            
           sed -i '' -e 's|Homepage: https://rustdesk.com|Homepage: ${{ fromJson(inputs.extras).urlLink }}|' ./build.py
           sed -i '' -e "s|launchUrl(Uri.parse('https://rustdesk.com'));|launchUrl(Uri.parse('${{ fromJson(inputs.extras).urlLink }}'));|" ./flutter/lib/common.dart
