@@ -89,7 +89,7 @@ jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
     with:
-      version: version: ${{ inputs.version }}
+      version: ${{ inputs.version }}
       
   build-for-macos-flutter:
     name: Build macOS
