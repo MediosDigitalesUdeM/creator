@@ -228,6 +228,154 @@ jobs:
           mv ./flutter/pubspec.yaml.tmp ./flutter/pubspec.yaml
           rm ./flutter/temp_dependency.txt
 
+      - name: Set up custom metadata and icons
+        run: |
+          # Backup original files
+          cp ./flutter/macos/Runner/Info.plist ./flutter/macos/Runner/Info.plist.bak
+          
+          # Enhanced metadata customization
+          CURRENT_YEAR=$(date +%Y)
+          
+          # Update Info.plist with extended metadata
+          plutil -replace CFBundleShortVersionString -string "${{ inputs.version }}" ./flutter/macos/Runner/Info.plist
+          plutil -replace CFBundleVersion -string "${{ inputs.version }}" ./flutter/macos/Runner/Info.plist
+          plutil -replace LSMinimumSystemVersion -string "10.14.0" ./flutter/macos/Runner/Info.plist
+          plutil -replace NSHumanReadableCopyright -string " ${CURRENT_YEAR} ${{ inputs.appname }}" ./flutter/macos/Runner/Info.plist
+          plutil -replace LSApplicationCategoryType -string "public.app-category.utilities" ./flutter/macos/Runner/Info.plist
+          
+          # Add additional metadata if provided in extras
+          if [ ! -z "${{ fromJson(inputs.extras).description }}" ]; then
+            plutil -replace NSHumanReadableDescription -string "${{ fromJson(inputs.extras).description }}" ./flutter/macos/Runner/Info.plist
+          fi
+          
+          # Enhanced icon handling
+          mkdir -p ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset
+          
+          # Function to generate icons of different sizes
+          generate_icon_set() {
+            local input_icon="$1"
+            local output_dir="./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset"
+            
+            # macOS icon sizes required by Xcode
+            declare -a sizes=("16" "32" "64" "128" "256" "512" "1024")
+            
+            for size in "${sizes[@]}"; do
+              # Generate regular size
+              magick convert "$input_icon" -resize "${size}x${size}" "$output_dir/app_icon_${size}.png"
+              # Generate @2x version (except for 1024)
+              if [ "$size" != "1024" ]; then
+                magick convert "$input_icon" -resize "$((size*2))x$((size*2))" "$output_dir/app_icon_${size}@2x.png"
+              fi
+            done
+          }
+          
+          # Generate tray icons with better quality
+          generate_tray_icons() {
+            local input_icon="$1"
+            local output_dir="./flutter/macos/Runner/Assets.xcassets"
+            
+            # Create directories for tray icons
+            mkdir -p "$output_dir/TrayIcon.imageset"
+            mkdir -p "$output_dir/TrayIconDark.imageset"
+            
+            # Generate light mode tray icon
+            magick convert "$input_icon" -resize "22x22" -background none -gravity center -extent 22x22 \
+              "$output_dir/TrayIcon.imageset/tray_icon.png"
+            magick convert "$input_icon" -resize "44x44" -background none -gravity center -extent 44x44 \
+              "$output_dir/TrayIcon.imageset/tray_icon@2x.png"
+            
+            # Generate dark mode tray icon (inverted)
+            magick convert "$input_icon" -resize "22x22" -background none -gravity center -extent 22x22 -negate \
+              "$output_dir/TrayIconDark.imageset/tray_icon_dark.png"
+            magick convert "$input_icon" -resize "44x44" -background none -gravity center -extent 44x44 -negate \
+              "$output_dir/TrayIconDark.imageset/tray_icon_dark@2x.png"
+          }
+          
+          # Download and process icons if custom URL provided
+          if [ ! -z "${{ fromJson(inputs.extras).iconUrl }}" ]; then
+            # Download custom icon
+            curl -L "${{ fromJson(inputs.extras).iconUrl }}" -o ./temp_icon.png
+            
+            # Generate all required icon sizes
+            generate_icon_set "./temp_icon.png"
+            generate_tray_icons "./temp_icon.png"
+            
+            # Create Contents.json for AppIcon
+            cat > ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json << 'EOL'
+{
+  "images" : [
+    {"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},
+    {"size":"16x16","idiom":"mac","filename":"app_icon_16@2x.png","scale":"2x"},
+    {"size":"32x32","idiom":"mac","filename":"app_icon_32.png","scale":"1x"},
+    {"size":"32x32","idiom":"mac","filename":"app_icon_32@2x.png","scale":"2x"},
+    {"size":"128x128","idiom":"mac","filename":"app_icon_128.png","scale":"1x"},
+    {"size":"128x128","idiom":"mac","filename":"app_icon_128@2x.png","scale":"2x"},
+    {"size":"256x256","idiom":"mac","filename":"app_icon_256.png","scale":"1x"},
+    {"size":"256x256","idiom":"mac","filename":"app_icon_256@2x.png","scale":"2x"},
+    {"size":"512x512","idiom":"mac","filename":"app_icon_512.png","scale":"1x"},
+    {"size":"512x512","idiom":"mac","filename":"app_icon_512@2x.png","scale":"2x"}
+  ],
+  "info" : {
+    "version" : 1,
+    "author" : "xcode"
+  }
+}
+EOL
+            
+            # Create Contents.json for TrayIcon
+            cat > ./flutter/macos/Runner/Assets.xcassets/TrayIcon.imageset/Contents.json << 'EOL'
+{
+  "images" : [
+    {
+      "idiom" : "universal",
+      "filename" : "tray_icon.png",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "universal",
+      "filename" : "tray_icon@2x.png",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "version" : 1,
+    "author" : "xcode"
+  },
+  "properties" : {
+    "template-rendering-intent" : "template"
+  }
+}
+EOL
+            
+            # Create Contents.json for TrayIconDark
+            cat > ./flutter/macos/Runner/Assets.xcassets/TrayIconDark.imageset/Contents.json << 'EOL'
+{
+  "images" : [
+    {
+      "idiom" : "universal",
+      "filename" : "tray_icon_dark.png",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "universal",
+      "filename" : "tray_icon_dark@2x.png",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "version" : 1,
+    "author" : "xcode"
+  },
+  "properties" : {
+    "template-rendering-intent" : "template"
+  }
+}
+EOL
+            
+            # Cleanup
+            rm -f ./temp_icon.png
+          fi
+
       - name: Install flutter
         uses: subosito/flutter-action@v2.12.0
         with:
@@ -320,6 +468,17 @@ jobs:
           ls -la ./res/mac-tray-light-x2.png
           ls -la ./res/mac-icon.png
 
+      - name: Build rustdesk
+        run: |
+          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
+            MIN_MACOS_VERSION="12.3"
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+          fi
+          ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
+
       - name: ui.rs
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
@@ -331,15 +490,14 @@ jobs:
             b64=$(base64 < ./res/icon.png)
             sed -i '' -e "s~$SEARCH_STR.*\"~$b64\"~" ./src/ui.rs
           fi
-      
+           
       - name: fix connection delay
         continue-on-error: false
         if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
         shell: bash
         run: |
           sed -i '' -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
-      
-      
+
       - name: replace flutter icons
         continue-on-error: false
         shell: bash
@@ -358,17 +516,6 @@ jobs:
           flutter pub run flutter_launcher_icons
           cd ..
       
-      - name: Build rustdesk
-        run: |
-          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
-            MIN_MACOS_VERSION="12.3"
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
-            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
-            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
-            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
-          fi
-          ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
-           
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
         shell: bash
@@ -401,7 +548,7 @@ jobs:
       
       - name: icon svg handling
         if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: false
+        continue-on-error: true
         shell: bash
         run: |
           ASSETS_DIR="build/macos/Build/Products/Release/RustDesk.app/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
@@ -417,7 +564,7 @@ jobs:
 
       - name: logo handling
         if: ${{ inputs.logolink != 'false' }}
-        continue-on-error: false
+        continue-on-error: true
         shell: bash
         run: |
           ASSETS_DIR="build/macos/Build/Products/Release/RustDesk.app/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
