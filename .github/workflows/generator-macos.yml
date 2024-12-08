@@ -252,17 +252,19 @@ jobs:
 
       - name: Icon stuff
         if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: true
+        continue-on-error: false
         shell: bash
         run: |
           mv ./res/icon.ico ./res/icon.ico.bak
           mv ./res/icon.png ./res/icon.png.bak
           mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
+          mv ./res/mac-icon.png ./res/mac-icon.png.bak
+          mv ./res/mac-tray-dark-x2.png ./res/mac-tray-dark-x2.png.bak
           #echo "${{ inputs.iconbase64 }}" | base64 -d > ./res/icon.png
 
       - name: Magick stuff
         if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: true
+        continue-on-error: false
         shell: bash
         run: |
           # Download icon using curl with additional SSL options
