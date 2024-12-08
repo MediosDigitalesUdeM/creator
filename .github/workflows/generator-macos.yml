@@ -189,20 +189,21 @@ jobs:
           cp ./flutter/macos/Runner/Configs/AppInfo.xcconfig ./flutter/macos/Runner/Configs/AppInfo.xcconfig.bak
           sed -i '' -e 's|PRODUCT_NAME = .*|PRODUCT_NAME = ${{ inputs.appname }}|' ./flutter/macos/Runner/Configs/AppInfo.xcconfig
           sed -i '' -e 's|PRODUCT_BUNDLE_IDENTIFIER = .*|PRODUCT_BUNDLE_IDENTIFIER = com.${{ inputs.appname }}.app|' ./flutter/macos/Runner/Configs/AppInfo.xcconfig
-          sed -i '' -e 's|DEVELOPMENT_TEAM = .*|DEVELOPMENT_TEAM = |' ./flutter/macos/Runner/Configs/AppInfo.xcconfig
-
+          # Keep DEVELOPMENT_TEAM if it exists, don't blank it out
+          
           # Update Xcode project settings
           sed -i '' -e 's/PRODUCT_NAME = "RustDesk"/PRODUCT_NAME = "${{ inputs.appname }}"/' ./flutter/macos/Runner.xcodeproj/project.pbxproj
           sed -i '' -e 's/PRODUCT_BUNDLE_IDENTIFIER = ".*"/PRODUCT_BUNDLE_IDENTIFIER = "com.${{ inputs.appname }}.app"/' ./flutter/macos/Runner.xcodeproj/project.pbxproj
-          sed -i '' -e 's/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = ;/' ./flutter/macos/Runner.xcodeproj/project.pbxproj
+          # Don't modify DEVELOPMENT_TEAM in project.pbxproj
 
           # Update CMake settings
           if [ -f "./flutter/macos/CMakeLists.txt" ]; then
             sed -i '' -e 's/set(BINARY_NAME ".*")/set(BINARY_NAME "${{ inputs.appname }}")/' ./flutter/macos/CMakeLists.txt
           fi
 
-          # Update Podfile
-          sed -i '' -e 's/target '"'"'Runner'"'"' do/target '"'"'${{ inputs.appname }}'"'"' do/' ./flutter/macos/Podfile
+          # Update Podfile - keep the target as 'Runner'
+          # sed -i '' -e 's/target '"'"'Runner'"'"' do/target '"'"'${{ inputs.appname }}'"'"' do/' ./flutter/macos/Podfile
+          sed -i '' -e 's/target '"'"'Runner'"'"' do/target '"'"'Runner'"'"' do/' ./flutter/macos/Podfile
 
           cp ./src/lang/en.rs ./src/lang/en.rs.bak
           cp ./src/lang/nl.rs ./src/lang/nl.rs.bak
