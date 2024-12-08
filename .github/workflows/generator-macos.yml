@@ -232,33 +232,26 @@ jobs:
         run: |
           # Backup original files
           cp ./flutter/macos/Runner/Info.plist ./flutter/macos/Runner/Info.plist.bak
-          
           # Enhanced metadata customization
           CURRENT_YEAR=$(date +%Y)
-          
           # Update Info.plist with extended metadata
           plutil -replace CFBundleShortVersionString -string "${{ inputs.version }}" ./flutter/macos/Runner/Info.plist
           plutil -replace CFBundleVersion -string "${{ inputs.version }}" ./flutter/macos/Runner/Info.plist
           plutil -replace LSMinimumSystemVersion -string "10.14.0" ./flutter/macos/Runner/Info.plist
           plutil -replace NSHumanReadableCopyright -string " ${CURRENT_YEAR} ${{ inputs.appname }}" ./flutter/macos/Runner/Info.plist
           plutil -replace LSApplicationCategoryType -string "public.app-category.utilities" ./flutter/macos/Runner/Info.plist
-          
           # Add additional metadata if provided in extras
           if [ ! -z "${{ fromJson(inputs.extras).description }}" ]; then
             plutil -replace NSHumanReadableDescription -string "${{ fromJson(inputs.extras).description }}" ./flutter/macos/Runner/Info.plist
           fi
-          
           # Enhanced icon handling
           mkdir -p ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset
-          
           # Function to generate icons of different sizes
           generate_icon_set() {
             local input_icon="$1"
             local output_dir="./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset"
-            
             # macOS icon sizes required by Xcode
             declare -a sizes=("16" "32" "64" "128" "256" "512" "1024")
-            
             for size in "${sizes[@]}"; do
               # Generate regular size
               magick convert "$input_icon" -resize "${size}x${size}" "$output_dir/app_icon_${size}.png"
@@ -268,38 +261,31 @@ jobs:
               fi
             done
           }
-          
           # Generate tray icons with better quality
           generate_tray_icons() {
             local input_icon="$1"
             local output_dir="./flutter/macos/Runner/Assets.xcassets"
-            
             # Create directories for tray icons
             mkdir -p "$output_dir/TrayIcon.imageset"
             mkdir -p "$output_dir/TrayIconDark.imageset"
-            
             # Generate light mode tray icon
             magick convert "$input_icon" -resize "22x22" -background none -gravity center -extent 22x22 \
               "$output_dir/TrayIcon.imageset/tray_icon.png"
             magick convert "$input_icon" -resize "44x44" -background none -gravity center -extent 44x44 \
               "$output_dir/TrayIcon.imageset/tray_icon@2x.png"
-            
             # Generate dark mode tray icon (inverted)
             magick convert "$input_icon" -resize "22x22" -background none -gravity center -extent 22x22 -negate \
               "$output_dir/TrayIconDark.imageset/tray_icon_dark.png"
             magick convert "$input_icon" -resize "44x44" -background none -gravity center -extent 44x44 -negate \
               "$output_dir/TrayIconDark.imageset/tray_icon_dark@2x.png"
           }
-          
           # Download and process icons if custom URL provided
           if [ ! -z "${{ fromJson(inputs.extras).iconUrl }}" ]; then
             # Download custom icon
             curl -L "${{ fromJson(inputs.extras).iconUrl }}" -o ./temp_icon.png
-            
             # Generate all required icon sizes
             generate_icon_set "./temp_icon.png"
             generate_tray_icons "./temp_icon.png"
-            
             # Create Contents.json for AppIcon
             cat > "./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json" << "EOJSON"
          {
