@@ -283,7 +283,7 @@ jobs:
             exit 1
           fi
 
-      - name: Magick stuff
+      - name: Magick stuff for macOS
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: false
         shell: bash
@@ -298,27 +298,57 @@ jobs:
           mv ./res/32x32.png ./res/32x32.png.bak || true
           mv ./res/64x64.png ./res/64x64.png.bak || true
           mv ./res/128x128.png ./res/128x128.png.bak || true
-          mv ./res/128x128@2x.png ./res/128x128@2x.png.bak || true
+          mv ./res/mac-icon.png ./res/mac-icon.png.bak || true
             
-          # Create ico and resize images
-          magick convert ./res/icon.png -define icon:auto-resize=256,64,48,32,16 ./res/icon.ico
-          cp ./res/icon.ico ./res/tray-icon.ico
+          # Create standard app icons
           magick convert ./res/icon.png -resize 32x32 ./res/32x32.png
           magick convert ./res/icon.png -resize 64x64 ./res/64x64.png
           magick convert ./res/icon.png -resize 128x128 ./res/128x128.png
-          magick convert ./res/128x128.png -resize 200% ./res/128x128@2x.png
-
-          # Create macOS specific icons - ensure they're in the res directory
+          
+          # Create macOS app icons
+          mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
+          magick convert ./res/icon.png -resize 16x16 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png"
+          magick convert ./res/icon.png -resize 32x32 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png"
+          magick convert ./res/icon.png -resize 64x64 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png"
+          magick convert ./res/icon.png -resize 128x128 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png"
+          magick convert ./res/icon.png -resize 256x256 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png"
+          magick convert ./res/icon.png -resize 512x512 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png"
+          magick convert ./res/icon.png -resize 1024x1024 "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
+          
+          # Create macOS specific icons
           magick convert ./res/icon.png -resize 128x128 ./res/mac-icon.png
-          # Create dark mode tray icon
+          
+          # Create dark mode tray icon (optimized for macOS menu bar)
           magick convert ./res/icon.png -resize 22x22 -colorspace gray -alpha set -background none -channel A -evaluate set 100% ./res/mac-tray-dark-x2.png
-          # Create light mode tray icon
+          
+          # Create light mode tray icon (optimized for macOS menu bar)
           magick convert ./res/icon.png -resize 22x22 -negate -colorspace gray -alpha set -background none -channel A -evaluate set 100% ./res/mac-tray-light-x2.png
+          
+          # Create Contents.json for macOS app icon
+          echo '{
+            "images": [
+              {"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},
+              {"size":"16x16","idiom":"mac","filename":"app_icon_32.png","scale":"2x"},
+              {"size":"32x32","idiom":"mac","filename":"app_icon_32.png","scale":"1x"},
+              {"size":"32x32","idiom":"mac","filename":"app_icon_64.png","scale":"2x"},
+              {"size":"128x128","idiom":"mac","filename":"app_icon_128.png","scale":"1x"},
+              {"size":"128x128","idiom":"mac","filename":"app_icon_256.png","scale":"2x"},
+              {"size":"256x256","idiom":"mac","filename":"app_icon_256.png","scale":"1x"},
+              {"size":"256x256","idiom":"mac","filename":"app_icon_512.png","scale":"2x"},
+              {"size":"512x512","idiom":"mac","filename":"app_icon_512.png","scale":"1x"},
+              {"size":"512x512","idiom":"mac","filename":"app_icon_1024.png","scale":"2x"}
+            ],
+            "info": {
+              "version": 1,
+              "author": "xcode"
+            }
+          }' > "macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json"
           
           # Verify files exist
           ls -la ./res/mac-tray-dark-x2.png
           ls -la ./res/mac-tray-light-x2.png
           ls -la ./res/mac-icon.png
+          ls -la macos/Runner/Assets.xcassets/AppIcon.appiconset/
 
       - name: ui.rs
         if: ${{ inputs.iconlink != 'false' }}
