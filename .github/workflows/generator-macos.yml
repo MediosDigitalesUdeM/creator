@@ -386,6 +386,7 @@ jobs:
           cd ./flutter
           # Create required directories and files
           mkdir -p web
+          mkdir -p assets
           echo '{"name":"${{ inputs.appname }}","short_name":"${{ inputs.appname }}","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","description":"A remote desktop software."}' > web/manifest.json
           echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${{ inputs.appname }}</title></head><body></body></html>' > web/index.html
           
@@ -393,14 +394,14 @@ jobs:
           mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
           
           # Copy the processed icons to Flutter locations
-          cp ../res/icon.png assets/icon.png
-          cp assets/icon.svg assets/icon.svg
+          cp ../res/icon.png ./assets/icon.png
+          cp ../flutter/assets/icon.svg ./assets/icon.svg || true
           
           flutter pub upgrade win32
           flutter pub get
           flutter pub run flutter_launcher_icons
           cd ..
-
+      
       - name: ui.rs
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
