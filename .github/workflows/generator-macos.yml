@@ -293,6 +293,7 @@ jobs:
           mkdir -p ./flutter/assets
           mkdir -p ./flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset
           mkdir -p ./macos/Runner/Assets.xcassets/AppIcon.appiconset
+          mkdir -p ./rustdesk/data/flutter_assets/assets
 
           # Download icon using curl with additional SSL options
           curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
@@ -307,6 +308,7 @@ jobs:
           [ -f "./res/mac-icon.png" ] && mv ./res/mac-icon.png ./res/mac-icon.png.bak
           [ -f "./flutter/assets/icon.png" ] && mv ./flutter/assets/icon.png ./flutter/assets/icon.png.bak
           [ -f "./flutter/assets/icon.svg" ] && mv ./flutter/assets/icon.svg ./flutter/assets/icon.svg.bak
+          [ -f "./rustdesk/data/flutter_assets/assets/icon.svg" ] && mv ./rustdesk/data/flutter_assets/assets/icon.svg ./rustdesk/data/flutter_assets/assets/icon.svg.bak
             
           # Create standard app icons
           magick ./res/icon.png -resize 32x32 ./res/32x32.png
@@ -315,10 +317,12 @@ jobs:
           
           # Copy icon to Flutter assets
           cp ./res/icon.png ./flutter/assets/icon.png
+          cp ./res/icon.png ./rustdesk/data/flutter_assets/assets/icon.png
           
           # Convert PNG to SVG using potrace
           magick ./res/icon.png -flatten ./temp_icon.pbm
           potrace --svg -o ./flutter/assets/icon.svg ./temp_icon.pbm
+          cp ./flutter/assets/icon.svg ./rustdesk/data/flutter_assets/assets/icon.svg
           rm ./temp_icon.pbm
           
           # Create macOS app icons
@@ -371,6 +375,31 @@ jobs:
           ls -lh flutter/macos/Runner/Assets.xcassets/AppIcon.appiconset/
           echo "Flutter assets:"
           ls -lh flutter/assets/icon.*
+          echo "RustDesk Flutter assets:"
+          ls -lh rustdesk/data/flutter_assets/assets/
+
+      - name: replace flutter icons
+        if: ${{ inputs.iconlink != 'false' }}
+        continue-on-error: false
+        shell: bash
+        run: |
+          cd ./flutter
+          # Create required directories and files
+          mkdir -p web
+          echo '{"name":"${{ inputs.appname }}","short_name":"${{ inputs.appname }}","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","description":"A remote desktop software."}' > web/manifest.json
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${{ inputs.appname }}</title></head><body></body></html>' > web/index.html
+          
+          # Ensure the AppIcon.appiconset directory exists
+          mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
+          
+          # Copy the processed icons to Flutter locations
+          cp ../res/icon.png assets/icon.png
+          cp assets/icon.svg assets/icon.svg
+          
+          flutter pub upgrade win32
+          flutter pub get
+          flutter pub run flutter_launcher_icons
+          cd ..
 
       - name: ui.rs
         if: ${{ inputs.iconlink != 'false' }}
@@ -383,7 +412,7 @@ jobs:
             b64=$(base64 < ./res/icon.png)
             sed -i '' -e "s~$SEARCH_STR.*\"~$b64\"~" ./src/ui.rs
           fi
-      
+
       - name: fix connection delay
         continue-on-error: false
         if: ${{ fromJson(inputs.extras).delayFix == 'true' }}
@@ -392,24 +421,39 @@ jobs:
           sed -i '' -e '/if !key.is_empty() && !token.is_empty() {/,/}/d' ./src/client.rs
       
       
-      - name: replace flutter icons
-        continue-on-error: false
-        shell: bash
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+            toolchain: ${{ env.MAC_RUST_VERSION }}
+            targets: ${{ matrix.job.target }}
+            components: "rustfmt"
+  
+        
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+            vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+            doNotCache: false
+  
+      - name: Install vcpkg dependencies
         run: |
-          cd ./flutter
-          # Create required directories and files
-          mkdir -p web
-          echo '{"name":"RustDesk","short_name":"RustDesk","start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","description":"A remote desktop software."}' > web/manifest.json
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>RustDesk</title></head><body></body></html>' > web/index.html
-          
-          mkdir -p macos/Runner/Assets.xcassets/AppIcon.appiconset
-          echo '{"images":[{"size":"16x16","idiom":"mac","filename":"app_icon_16.png","scale":"1x"},{"size":"16x16","idiom":"mac","filename":"app_icon_32.png","scale":"2x"},{"size":"32x32","idiom":"mac","filename":"app_icon_32.png","scale":"1x"},{"size":"32x32","idiom":"mac","filename":"app_icon_64.png","scale":"2x"},{"size":"128x128","idiom":"mac","filename":"app_icon_128.png","scale":"1x"},{"size":"128x128","idiom":"mac","filename":"app_icon_256.png","scale":"2x"},{"size":"256x256","idiom":"mac","filename":"app_icon_256.png","scale":"1x"},{"size":"256x256","idiom":"mac","filename":"app_icon_512.png","scale":"2x"},{"size":"512x512","idiom":"mac","filename":"app_icon_512.png","scale":"1x"},{"size":"512x512","idiom":"mac","filename":"app_icon_1024.png","scale":"2x"}],"info":{"version":1,"author":"xcode"}}' > macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json
-          
-          flutter pub upgrade win32
-          flutter pub get
-          flutter pub run flutter_launcher_icons
-          cd ..
-      
+          if ! $VCPKG_ROOT/vcpkg \
+            install \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              echo "======"
+              cat "$_1"
+              echo "======"
+              echo ""
+            done
+            exit 1
+          fi
+
       - name: Build rustdesk
         run: |
           if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
