@@ -167,12 +167,12 @@ jobs:
           sed -i '' -e 's|FileDescription = "RustDesk Remote Desktop"|FileDescription = "${{ inputs.appname }}"|' ./libs/portable/Cargo.toml
           sed -i '' -e 's|OriginalFilename = "rustdesk.exe"|OriginalFilename = "${{ inputs.appname }}.exe"|' ./libs/portable/Cargo.toml
             
-          cp ./flutter/windows/runner/Runner.rc ./flutter/windows/runner/Runner.rc.bak
-          sed -i '' -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|"Copyright 2024 Purslane Ltd. All rights reserved."|"Copyright 2024"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|"rustdesk.exe"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
-          sed -i '' -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
+          cp ./flutter/macos/runner/Runner.rc ./flutter/macos/runner/Runner.rc.bak
+          sed -i '' -e 's|"RustDesk Remote Desktop"|"${{ inputs.appname }}"|' ./flutter/macos/runner/Runner.rc
+          sed -i '' -e 's|VALUE "InternalName", "rustdesk" "\0"|VALUE "InternalName", "${{ inputs.appname }}" "\0"|' ./flutter/macos/runner/Runner.rc
+          sed -i '' -e 's|"Copyright 2024 Purslane Ltd. All rights reserved."|"Copyright 2024"|' ./flutter/macos/runner/Runner.rc
+          sed -i '' -e 's|"rustdesk.exe"|"${{ inputs.appname }}"|' ./flutter/macos/runner/Runner.rc
+          sed -i '' -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/macos/runner/Runner.rc
 
           # MACSTUFF Backup the original Info.plist
           cp ./flutter/macos/Runner/Info.plist ./flutter/macos/Runner/Info.plist.bak
