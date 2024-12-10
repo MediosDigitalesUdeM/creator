@@ -146,12 +146,13 @@ jobs:
               name: bridge-artifact
               path: ./
 
-      - name: Install ImageMagick on macOS and potrace for handling icon
+      - name: Install imagemagick and potrace
+        shell: bash
         run: |
           brew install imagemagick potrace
           echo "$(brew --prefix imagemagick)/bin" >> $GITHUB_PATH
 
-      - name: cargo.toml, runner.rc name, en.rs
+      - name: Update macOS Info.plist and settings
         continue-on-error: false
         shell: bash
         run: |
@@ -609,20 +610,12 @@ jobs:
             "${{ inputs.appname }}.app"
           mv "${{ inputs.appname }}-${{ matrix.job.arch }}.dmg" $GITHUB_WORKSPACE/
       
-      - name: Upload unsigned macOS app
-        if: env.UPLOAD_ARTIFACT == 'true'
-        uses: actions/upload-artifact@master
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ inputs.appname }}-${{ matrix.job.arch }}
-          path: ${{ inputs.appname }}-${{ matrix.job.arch }}.dmg 
+          name: ${{ inputs.filename }}-macOS-${{ matrix.job.arch }}
+          path: flutter/build/macos/Build/Products/Release/${{ inputs.filename }}.dmg 
           
-      #- name: Upload unsigned
-      #  if: env.UPLOAD_ARTIFACT == 'true'
-      #  uses: actions/upload-artifact@master
-      #  with:
-      #    name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
-      #    path: rustdesk
-
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
@@ -630,13 +623,6 @@ jobs:
             mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
       
-      #- name: Package macOS App
-      #  run: |
-      #    cd flutter/build/macos/Build/Products/Release
-      #    if [ -d "RustDesk.app" ]; then
-      #      mv "RustDesk.app" "${{ inputs.appname }}.app"
-      #    fi
-
       - name: Publish DMG package
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@v1
