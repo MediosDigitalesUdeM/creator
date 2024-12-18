@@ -146,10 +146,10 @@ jobs:
               name: bridge-artifact
               path: ./
 
-      - name: Install imagemagick and potrace and nasm
+      - name: Install imagemagick and potrace and nasm and and
         shell: bash
         run: |
-          brew install imagemagick potrace nasm
+          brew install imagemagick potrace nasm cmake gcc wget ninja
           echo "$(brew --prefix imagemagick)/bin" >> $GITHUB_PATH
 
       - name: Update macOS Info.plist and settings
