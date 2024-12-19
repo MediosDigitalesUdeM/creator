@@ -624,14 +624,14 @@ jobs:
             mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
       
-      - name: Publish DMG package
-        if: env.UPLOAD_ARTIFACT == 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          prerelease: true
-          tag_name: ${{ inputs.upload-tag }}
-          files: |
-            ${{ inputs.appname }}*-${{ matrix.job.arch }}.dmg
+      #- name: Publish DMG package
+      #  if: env.UPLOAD_ARTIFACT == 'true'
+      #  uses: softprops/action-gh-release@v1
+      #  with:
+      #    prerelease: true
+      #    tag_name: ${{ inputs.upload-tag }}
+      #    files: |
+      #      ${{ inputs.appname }}*-${{ matrix.job.arch }}.dmg
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
