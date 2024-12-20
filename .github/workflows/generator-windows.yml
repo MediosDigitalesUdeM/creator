@@ -293,6 +293,7 @@ jobs:
             done
             exit 1
           fi
+          head -n 100 "${VCPKG_ROOT}/buildtrees/ffmpeg/build-${{ matrix.job.vcpkg-triplet }}-rel-out.log" || true
         shell: bash
 
       - name: icon stuff
