@@ -672,8 +672,8 @@ jobs:
 
       - name: Create DMG
         run: |
-          cd flutter/build/macos/Build/Products/Release
-          # Print directory contents for debugging
+          cd /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release
+        # Print directory contents for debugging
           echo "Directory contents:"
           ls -la
           # Find the actual .app bundle
@@ -696,7 +696,7 @@ jobs:
             --app-drop-link 600 185 \
             "${{ inputs.appname }}-${{ matrix.job.arch }}.dmg" \
             "${{ inputs.appname }}.app"
-          mv "${{ inputs.appname }}-${{ matrix.job.arch }}.dmg" $GITHUB_WORKSPACE/
+        mv "${{ inputs.appname }}-${{ matrix.job.arch }}.dmg" $GITHUB_WORKSPACE/
       
       - name: Upload unsigned macOS app
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -708,10 +708,9 @@ jobs:
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          for name in ${{ inputs.appname }}*??.dmg; do
-            mv "$name" "${name%%.dmg}.dmg"
+          for name in /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release/${{ inputs.appname }}*??.dmg; do
+            mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
-
 
       - name: send file to rdgen server
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
