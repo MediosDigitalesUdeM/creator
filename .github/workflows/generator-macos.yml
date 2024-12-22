@@ -713,17 +713,17 @@ jobs:
           done
 
 
-      - name: send file to rdgen server
-        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@./SignOutput/${{ inputs.filename }}.dmg" -F "uuid=${{ inputs.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+      #- name: send file to rdgen server
+      #  if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
+      #  shell: bash
+      #  run: |
+      #    curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@./SignOutput/${{ inputs.filename }}.dmg" -F "uuid=${{ inputs.uuid }}" ${{ secrets.GENURL }}/save_custom_client
 
-      - name: send file to api server
-        if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@./SignOutput/${{ inputs.filename }}.dmg" ${{ inputs.apiServer }}/api/save_custom_client
+      #- name: send file to api server
+      #  if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
+      #  shell: bash
+      #  run: |
+      #    curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@./SignOutput/${{ inputs.filename }}.dmg" ${{ inputs.apiServer }}/api/save_custom_client
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
