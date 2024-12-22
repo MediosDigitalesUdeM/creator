@@ -219,6 +219,14 @@ jobs:
           mv ./flutter/pubspec.yaml.tmp ./flutter/pubspec.yaml
           rm ./flutter/temp_dependency.txt
 
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "10% complete"}'    
+
       - name: Install flutter
         uses: subosito/flutter-action@v2.12.0
         with:
@@ -457,11 +465,27 @@ jobs:
             toolchain: ${{ env.MAC_RUST_VERSION }}
             targets: ${{ matrix.job.target }}
             components: "rustfmt"
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "15% complete"}'
   
         
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: ${{ matrix.job.os }}
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "20% complete"}'
 
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@v11
@@ -484,6 +508,14 @@ jobs:
             exit 1
           fi
 
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "25% complete"}'
+
       - name: Build rustdesk
         run: |
           if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
@@ -494,7 +526,15 @@ jobs:
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
           ./build.py --flutter --hwcodec ${{ matrix.job.extra-build-args }}
-           
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "50% complete, this step takes about 5 minutes, be patient."}'
+      
       - name: Install rcodesign tool
         if: env.MACOS_P12_BASE64 != null
         shell: bash
@@ -514,6 +554,14 @@ jobs:
           else
               brew install pkg-config
           fi
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "70% complete, this step takes about 5 minutes, be patient."}'
   
       - name: Show version information (Rust, cargo, Clang)
         shell: bash
@@ -555,6 +603,14 @@ jobs:
           wget --no-check-certificate \
             -O "$ASSETS_DIR/logo.png" \
             "${{ fromJson(inputs.logolink).url }}/get_png?filename=${{ fromJson(inputs.logolink).file }}&uuid=${{ fromJson(inputs.logolink).uuid }}"
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "85% complete"}'
 
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
@@ -655,6 +711,45 @@ jobs:
           for name in ${{ inputs.appname }}*??.dmg; do
             mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
+
+
+      - name: send file to rdgen server
+        if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
+        shell: bash
+        run: |
+          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@./SignOutput/${{ inputs.filename }}.dmg" -F "uuid=${{ inputs.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+
+      - name: send file to api server
+        if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
+        shell: bash
+        run: |
+          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@./SignOutput/${{ inputs.filename }}.dmg" ${{ inputs.apiServer }}/api/save_custom_client
+
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "Success"}'
+
+      - name: failed
+        if: failure()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "Generation failed, try again"}'
+
+      - name: failed
+        if: cancelled()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ inputs.uuid }}", "status": "Generation cancelled, try again"}'
       
       #- name: Publish DMG package
       #  if: env.UPLOAD_ARTIFACT == 'true'
