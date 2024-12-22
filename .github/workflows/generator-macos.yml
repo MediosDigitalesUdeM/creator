@@ -709,7 +709,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           for name in ${{ inputs.appname }}*??.dmg; do
-            mv "$name" "${name%%.dmg}-aarch64.dmg"
+            mv "$name" "${name%%.dmg}.dmg"
           done
 
 
