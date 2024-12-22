@@ -708,7 +708,7 @@ jobs:
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          for name in /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release/${{ inputs.appname }}*??.dmg; do
+          for name in /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.dmg; do
             mv "$name" "${name%%.dmg}-aarch64.dmg"
           done
 
