@@ -709,7 +709,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           for name in /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release/${{ inputs.appname }}-${{ matrix.job.arch }}.dmg; do
-            mv "$name" "${name%%.dmg}.dmg"
+            mv "$name" "${{ inputs.appname }}.dmg"
           done
 
       - name: send file to rdgen server
