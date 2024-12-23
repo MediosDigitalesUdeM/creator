@@ -705,10 +705,10 @@ jobs:
       #    name: ${{ inputs.appname }}-${{ matrix.job.arch }}
       #    path: ${{ inputs.appname }}-${{ matrix.job.arch }}.dmg 
 
-     - name: List directory contents
-       run: |
-         cd /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release
-         ls -la
+      - name: List directory contents
+        run: |
+          cd /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release
+          ls -la
           
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
