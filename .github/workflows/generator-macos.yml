@@ -714,7 +714,20 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release
-          mv "${{ inputs.appname }}-${{ matrix.job.arch }}.dmg" "${{ inputs.appname }}.dmg"
+          echo "Directory contents:"
+          ls -la
+            
+          # Find the DMG file dynamically
+          DMG_FILE=$(find . -name "*-${{ matrix.job.arch }}.dmg")
+            
+          if [ -n "$DMG_FILE" ]; then
+            echo "Found DMG file: $DMG_FILE"
+            mv "$DMG_FILE" "${{ inputs.appname }}.dmg"
+            echo "Renamed to ${{ inputs.appname }}.dmg"
+          else
+            echo "No DMG file found matching the pattern"
+            exit 1
+          fi
 
       - name: send file to rdgen server
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
