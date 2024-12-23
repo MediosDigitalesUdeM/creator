@@ -743,8 +743,16 @@ jobs:
         if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
         shell: bash
         run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@/Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.dmg" ${{ inputs.apiServer }}/api/save_custom_client
-
+          DMG_FILE=$(find $GITHUB_WORKSPACE -name "${{ inputs.appname }}.dmg")
+          
+          if [ -n "$DMG_FILE" ]; then
+            echo "Found DMG file: $DMG_FILE"
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@$DMG_FILE" ${{ inputs.apiServer }}/api/save_custom_client
+          else
+            echo "No DMG file found"
+            exit 1
+          fi
+      
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
