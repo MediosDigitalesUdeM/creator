@@ -713,12 +713,12 @@ jobs:
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release
+          cd $GITHUB_WORKSPACE
           echo "Directory contents:"
           ls -la
             
           # Find the DMG file dynamically
-          DMG_FILE=$(find . -name "*-${{ matrix.job.arch }}.dmg")
+          DMG_FILE=$(find . -name "${{ inputs.appname }}-${{ matrix.job.arch }}.dmg")
             
           if [ -n "$DMG_FILE" ]; then
             echo "Found DMG file: $DMG_FILE"
