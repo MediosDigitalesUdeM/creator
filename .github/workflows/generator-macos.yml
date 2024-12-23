@@ -705,11 +705,7 @@ jobs:
       #    name: ${{ inputs.appname }}-${{ matrix.job.arch }}
       #    path: ${{ inputs.appname }}-${{ matrix.job.arch }}.dmg 
 
-      - name: List directory contents
-        run: |
-          cd /Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release
-          ls -la
-          
+         
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
@@ -733,7 +729,15 @@ jobs:
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
         shell: bash
         run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@/Users/runner/work/creator/creator/flutter/build/macos/Build/Products/Release/${{ inputs.appname }}.dmg" -F "uuid=${{ inputs.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+          DMG_FILE=$(find $GITHUB_WORKSPACE -name "${{ inputs.appname }}.dmg")
+          
+          if [ -n "$DMG_FILE" ]; then
+            echo "Found DMG file: $DMG_FILE"
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@$DMG_FILE" -F "uuid=${{ inputs.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+          else
+            echo "No DMG file found"
+            exit 1
+          fi
 
       - name: send file to api server
         if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
