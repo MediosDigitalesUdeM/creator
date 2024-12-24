@@ -730,19 +730,26 @@ jobs:
         shell: bash
         run: |
           DMG_FILE=$(find $GITHUB_WORKSPACE -name "${{ inputs.appname }}.dmg")
+          UUID="${{ inputs.uuid }}"
           
           if [ -n "$DMG_FILE" ]; then
             echo "Found DMG file: $DMG_FILE"
             echo "File size: $(du -h "$DMG_FILE")"
-            echo "Full URL: ${{ secrets.GENURL }}/save_custom_client"
+            echo "UUID: $UUID"
+            echo "Full URL: ${{ secrets.GENURL }}/creategh"
+
+            # Create the expected directory structure
+            mkdir -p "$GITHUB_WORKSPACE/exe/$UUID"
+            cp "$DMG_FILE" "$GITHUB_WORKSPACE/exe/$UUID/${{ inputs.appname }}.dmg"
 
             curl -v -i -X POST \
                -H "Content-Type: multipart/form-data" \
                -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
-               -F "file=@$DMG_FILE" \
-               -F "uuid=${{ inputs.uuid }}" \
+               -F "file=@$GITHUB_WORKSPACE/exe/$UUID/Musiclover.dmg" \
+               -F "uuid=$UUID" \
                -F "platform=macos" \
-               "${{ secrets.GENURL }}/save_custom_client"
+               -F "filename=Musiclover.dmg" \
+               "${{ secrets.GENURL }}/creategh"
           else
             echo "No DMG file found"
             exit 1
@@ -758,13 +765,22 @@ jobs:
           if [ -n "$DMG_FILE" ]; then
             echo "Found DMG file: $DMG_FILE"
             echo "File size: $(du -h "$DMG_FILE")"
+            echo "UUID: $UUID"
+            echo "Full URL: ${{ secrets.GENURL }}/creategh"
+
+            # Create the expected directory structure
+            mkdir -p "$GITHUB_WORKSPACE/exe/$UUID"
+            cp "$DMG_FILE" "$GITHUB_WORKSPACE/exe/$UUID/Musiclover.dmg"
 
             curl -v -i -X POST \
                -H "Content-Type: multipart/form-data" \
                -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
-               -F "file=@$DMG_FILE" \
+               -F "file=@$GITHUB_WORKSPACE/exe/$UUID/Musiclover.dmg" \
+               -F "uuid=$UUID" \
                -F "platform=macos" \
-               "${{ inputs.apiServer }}/api/save_custom_client"
+               -F "filename=Musiclover.dmg" \
+               "${{ secrets.GENURL }}/creategh"
+               
           else
            echo "No DMG file found"
            exit 1
