@@ -734,7 +734,6 @@ jobs:
             -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
             -F "file=@$GITHUB_WORKSPACE/${{ inputs.filename }}.dmg" \
             -F "uuid=${{ inputs.uuid }}" \
-            -F "platform=windows" \
             "${{ secrets.GENURL }}/save_custom_client"
         
 
@@ -746,7 +745,6 @@ jobs:
             -H "Content-Type: multipart/form-data" \
             -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
             -F "file=@$GITHUB_WORKSPACE/${{ inputs.filename }}.dmg" \
-            -F "platform=windows" \
             "${{ inputs.apiServer }}/api/save_custom_client"
 
       - name: Report Status
