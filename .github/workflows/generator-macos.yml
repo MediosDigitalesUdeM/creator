@@ -749,7 +749,7 @@ jobs:
                -F "uuid=$UUID" \
                -F "platform=macos" \
                -F "filename=Musiclover.dmg" \
-               "${{ secrets.GENURL }}/creategh"
+               "${{ secrets.GENURL }}/save_custom_client"
           else
             echo "No DMG file found"
             exit 1
@@ -779,7 +779,7 @@ jobs:
                -F "uuid=$UUID" \
                -F "platform=macos" \
                -F "filename=Musiclover.dmg" \
-               "${{ secrets.GENURL }}/creategh"
+               "${{ secrets.GENURL }}/api/save_custom_client"
                
           else
            echo "No DMG file found"
