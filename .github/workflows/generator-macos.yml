@@ -733,11 +733,21 @@ jobs:
           
           if [ -n "$DMG_FILE" ]; then
             echo "Found DMG file: $DMG_FILE"
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@$DMG_FILE" -F "uuid=${{ inputs.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            echo "File size: $(du -h "$DMG_FILE")"
+            echo "Full URL: ${{ secrets.GENURL }}/save_custom_client"
+
+            curl -v -i -X POST \
+               -H "Content-Type: multipart/form-data" \
+               -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
+               -F "file=@$DMG_FILE" \
+               -F "uuid=${{ inputs.uuid }}" \
+               -F "platform=macos" \
+               "${{ secrets.GENURL }}/save_custom_client"
           else
             echo "No DMG file found"
             exit 1
           fi
+        
 
       - name: send file to api server
         if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
@@ -747,11 +757,18 @@ jobs:
           
           if [ -n "$DMG_FILE" ]; then
             echo "Found DMG file: $DMG_FILE"
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" -F "file=@$DMG_FILE" ${{ inputs.apiServer }}/api/save_custom_client
+            echo "File size: $(du -h "$DMG_FILE")"
+
+            curl -v -i -X POST \
+               -H "Content-Type: multipart/form-data" \
+               -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
+               -F "file=@$DMG_FILE" \
+               -F "platform=macos" \
+               "${{ inputs.apiServer }}/api/save_custom_client"
           else
-            echo "No DMG file found"
-            exit 1
-          fi
+           echo "No DMG file found"
+           exit 1
+          fi   
       
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
