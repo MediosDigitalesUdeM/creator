@@ -732,7 +732,7 @@ jobs:
           curl -i -X POST \
             -H "Content-Type: multipart/form-data" \
             -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
-            -F "file=@$GITHUB_WORKSPACE/${{ inputs.appname }}.dmg" \
+            -F "file=@$GITHUB_WORKSPACE/${{ inputs.filename }}.dmg" \
             -F "uuid=${{ inputs.uuid }}" \
             -F "platform=macos" \
             "${{ secrets.GENURL }}/save_custom_client"
@@ -745,7 +745,7 @@ jobs:
           curl -i -X POST \
             -H "Content-Type: multipart/form-data" \
             -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
-            -F "file=@$GITHUB_WORKSPACE/${{ inputs.appname }}.dmg" \
+            -F "file=@$GITHUB_WORKSPACE/${{ inputs.filename }}.dmg" \
             -F "platform=macos" \
             "${{ inputs.apiServer }}/api/save_custom_client"
 
