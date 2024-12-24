@@ -547,7 +547,7 @@ jobs:
 
       - name: Install build runtime
         run: |
-          brew install llvm create-dmg nasm cmake gcc wget ninja potrace
+          brew install llvm create-dmg nasm cmake gcc wget ninja
           # pkg-config is handled in a separate step, because it may be already installed by `macos-latest`(14.7.1) runner
           if command -v pkg-config &>/dev/null; then
               echo "pkg-config is already installed"
@@ -729,63 +729,26 @@ jobs:
         if: ${{ fromJson(inputs.extras).rdgen == 'true' }}
         shell: bash
         run: |
-          DMG_FILE=$(find $GITHUB_WORKSPACE -name "${{ inputs.appname }}.dmg")
-          UUID="${{ inputs.uuid }}"
-          
-          if [ -n "$DMG_FILE" ]; then
-            echo "Found DMG file: $DMG_FILE"
-            echo "File size: $(du -h "$DMG_FILE")"
-            echo "UUID: $UUID"
-            echo "Full URL: ${{ secrets.GENURL }}/creategh"
-
-            # Create the expected directory structure
-            mkdir -p "$GITHUB_WORKSPACE/exe/$UUID"
-            cp "$DMG_FILE" "$GITHUB_WORKSPACE/exe/$UUID/${{ inputs.appname }}.dmg"
-
-            curl -v -i -X POST \
-               -H "Content-Type: multipart/form-data" \
-               -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
-               -F "file=@$GITHUB_WORKSPACE/exe/$UUID/Musiclover.dmg" \
-               -F "uuid=$UUID" \
-               -F "platform=macos" \
-               -F "filename=Musiclover.dmg" \
-               "${{ secrets.GENURL }}/save_custom_client"
-          else
-            echo "No DMG file found"
-            exit 1
-          fi
+          curl -i -X POST \
+            -H "Content-Type: multipart/form-data" \
+            -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
+            -F "file=@$GITHUB_WORKSPACE/${{ inputs.appname }}.dmg" \
+            -F "uuid=${{ inputs.uuid }}" \
+            -F "platform=macos" \
+            "${{ secrets.GENURL }}/save_custom_client"
         
 
       - name: send file to api server
         if: ${{ fromJson(inputs.extras).rdgen == 'false' }}
         shell: bash
         run: |
-          DMG_FILE=$(find $GITHUB_WORKSPACE -name "${{ inputs.appname }}.dmg")
-          
-          if [ -n "$DMG_FILE" ]; then
-            echo "Found DMG file: $DMG_FILE"
-            echo "File size: $(du -h "$DMG_FILE")"
-            echo "UUID: $UUID"
-            echo "Full URL: ${{ secrets.GENURL }}/creategh"
+          curl -i -X POST \
+            -H "Content-Type: multipart/form-data" \
+            -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
+            -F "file=@$GITHUB_WORKSPACE/${{ inputs.appname }}.dmg" \
+            -F "platform=macos" \
+            "${{ inputs.apiServer }}/api/save_custom_client"
 
-            # Create the expected directory structure
-            mkdir -p "$GITHUB_WORKSPACE/exe/$UUID"
-            cp "$DMG_FILE" "$GITHUB_WORKSPACE/exe/$UUID/Musiclover.dmg"
-
-            curl -v -i -X POST \
-               -H "Content-Type: multipart/form-data" \
-               -H "Authorization: Bearer ${{ fromJson(inputs.extras).token }}" \
-               -F "file=@$GITHUB_WORKSPACE/exe/$UUID/Musiclover.dmg" \
-               -F "uuid=$UUID" \
-               -F "platform=macos" \
-               -F "filename=Musiclover.dmg" \
-               "${{ secrets.GENURL }}/api/save_custom_client"
-               
-          else
-           echo "No DMG file found"
-           exit 1
-          fi   
-      
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
         with:
@@ -820,5 +783,3 @@ jobs:
       #    tag_name: ${{ inputs.upload-tag }}
       #    files: |
       #      ${{ inputs.appname }}*-${{ matrix.job.arch }}.dmg
-
-      
