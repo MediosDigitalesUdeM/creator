@@ -719,7 +719,7 @@ jobs:
           if [ -n "$DMG_FILE" ]; then
             echo "Found DMG file: $DMG_FILE"
             mv "$DMG_FILE" "${{ inputs.filename }}.dmg"
-            echo "Renamed to ${{ inputs.appname }}.dmg"
+            echo "Renamed to ${{ inputs.filename }}.dmg"
           else
             echo "No DMG file found matching the pattern"
             exit 1
