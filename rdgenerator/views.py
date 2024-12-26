@@ -160,15 +160,15 @@ def generator_view(request):
             extra_input = json.dumps(extras)
 
             ####from here run the github action, we need user, repo, access token.
-           if platform == 'windows':
+            if platform == 'windows':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-windows.yml/dispatches' 
-           elif platform == 'linux':
+            elif platform == 'linux':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-linux.yml/dispatches'  
-           elif platform == 'android':
+            elif platform == 'android':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-android.yml/dispatches'
-           elif platform == 'macos':
+            elif platform == 'macos':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-macos.yml/dispatches'
-           else:
+            else:
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/creator/actions/workflows/generator-windows.yml/dispatches'
             ####breaking changes were made in 1.3.3 version, so if 1.3.2 or lower, use:
             if version == '1.3.2' or version == '1.3.1' or version == '1.3.0':
